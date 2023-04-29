@@ -223,7 +223,7 @@ class Handler(BaseRequestHandler):
                 if_now_round.clear()
                 if_now_round.wait()
             else:
-                print(f'Now Round:{now_user}')
+                print(f'Now Round:{users_name[now_user]}')
                 # 接受出牌信息
                 with lock:
 
@@ -239,6 +239,8 @@ class Handler(BaseRequestHandler):
                         header = self.request.recv(HEADER_LEN)
                         header = struct.unpack('i', header)[0]
                         now_score = json.loads(self.request.recv(header).decode())
+
+                        print(f'Played Cards:{played_cards[tag]}')
 
                         # skip
                         if played_cards[tag][0] == 'F':
