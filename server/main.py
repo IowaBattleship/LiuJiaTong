@@ -12,6 +12,7 @@ HEADER_LEN = 4
 users_name = []
 users_cards = []
 users_score = []
+if_users_run = [0 for _ in range(0, 6)]
 played_cards = []  # 场上所出手牌
 all_cards = []
 now_score = 0  # 场上分数
@@ -54,7 +55,8 @@ def init_users_cards():
 # 下一位玩家出牌
 def next_user(_now_user):
     _now_user = (_now_user + 1) % 6
-    while len(users_cards[_now_user]) == 0:
+    # while len(users_cards[_now_user]) == 0:
+    while if_users_run[_now_user] == 1:
         _now_user = (_now_user + 1) % 6
     return _now_user
 
@@ -92,7 +94,7 @@ class Handler(BaseRequestHandler):
             users_num = len(users_name)
             print(users_name)
 
-        global if_enough_user, if_now_round, now_user, now_score, head_master, last_played, _if_now_round
+        global if_enough_user, if_now_round, now_user, now_score, head_master, last_played, _if_now_round, if_users_run
         _local_if_now_round = _if_now_round
 
         if users_num == 6:  # 该线程作为发牌手
@@ -139,6 +141,11 @@ class Handler(BaseRequestHandler):
                     if _if_now_round > _local_if_now_round:
                         break
             else:
+                # 标记该玩家是否run
+                with lock:
+                    if len(users_cards[tag]) == 0:
+                        if_users_run[tag] = 1
+
                 # 一轮结束，统计此轮信息
                 if last_played == tag:
                     # 队伍有头科，此轮分数直接累加到队伍分数中
