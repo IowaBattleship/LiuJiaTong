@@ -225,41 +225,42 @@ class Handler(BaseRequestHandler):
             else:
                 print(f'Now Round:{now_user}')
                 # 接受出牌信息
-                with lock:
-                    header = self.request.recv(HEADER_LEN)
-                    header = struct.unpack('i', header)[0]
-                    users_cards[tag] = json.loads(self.request.recv(header).decode())
+                if if_users_run[tag] == 0:
+                    with lock:
+                        header = self.request.recv(HEADER_LEN)
+                        header = struct.unpack('i', header)[0]
+                        users_cards[tag] = json.loads(self.request.recv(header).decode())
 
-                    header = self.request.recv(HEADER_LEN)
-                    header = struct.unpack('i', header)[0]
-                    played_cards[tag] = json.loads(self.request.recv(header).decode())
+                        header = self.request.recv(HEADER_LEN)
+                        header = struct.unpack('i', header)[0]
+                        played_cards[tag] = json.loads(self.request.recv(header).decode())
 
-                    header = self.request.recv(HEADER_LEN)
-                    header = struct.unpack('i', header)[0]
-                    now_score = json.loads(self.request.recv(header).decode())
+                        header = self.request.recv(HEADER_LEN)
+                        header = struct.unpack('i', header)[0]
+                        now_score = json.loads(self.request.recv(header).decode())
 
-                    # skip
-                    if played_cards[tag][0] == 'F':
-                        played_cards[tag].clear()
-                    else:
-                        last_played = tag
+                        # skip
+                        if played_cards[tag][0] == 'F':
+                            played_cards[tag].clear()
+                        else:
+                            last_played = tag
 
-                        # 此轮逃出，更新队伍信息、头科，判断游戏是否结束
-                        if len(users_cards[tag]) == 0:
-                            team_out[tag % 2] += 1
+                            # 此轮逃出，更新队伍信息、头科，判断游戏是否结束
+                            if len(users_cards[tag]) == 0:
+                                team_out[tag % 2] += 1
 
-                            if head_master == -1:
-                                head_master = tag
-                                for i in range(6):
-                                    if i % 2 == head_master % 2:
-                                        team_score[i % 2] += users_score[i]
-                            # 若队伍有头科，就不需要累加，没有则累加
-                            elif head_master % 2 != tag % 2:
-                                team_score[tag % 2] += users_score[tag]
+                                if head_master == -1:
+                                    head_master = tag
+                                    for i in range(6):
+                                        if i % 2 == head_master % 2:
+                                            team_score[i % 2] += users_score[i]
+                                # 若队伍有头科，就不需要累加，没有则累加
+                                elif head_master % 2 != tag % 2:
+                                    team_score[tag % 2] += users_score[tag]
 
-                            _if_game_over = if_game_over()
+                                _if_game_over = if_game_over()
 
-                    now_user = next_user(now_user)  # 下一位出牌
+                        now_user = next_user(now_user)  # 下一位出牌
 
                 if_now_round.set()
 
