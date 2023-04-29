@@ -225,8 +225,9 @@ class Handler(BaseRequestHandler):
             else:
                 print(f'Now Round:{now_user}')
                 # 接受出牌信息
-                if if_users_run[tag] == 0:
-                    with lock:
+                with lock:
+
+                    if if_users_run[tag] == 0:
                         header = self.request.recv(HEADER_LEN)
                         header = struct.unpack('i', header)[0]
                         users_cards[tag] = json.loads(self.request.recv(header).decode())
@@ -260,7 +261,7 @@ class Handler(BaseRequestHandler):
 
                                 _if_game_over = if_game_over()
 
-                        now_user = next_user(now_user)  # 下一位出牌
+                    now_user = next_user(now_user)  # 下一位出牌
 
                 if_now_round.set()
 
