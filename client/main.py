@@ -87,8 +87,10 @@ class Client:
             header = struct.unpack('i', header)[0]
             head_master = int(self.client.recv(header).decode())
 
+            biggest_player = utils.last_played(played_cards, now_user)
+
             main_interface(users_name, tag, users_score, users_cards_len, played_cards,
-                           user, now_score, now_user, head_master)
+                           user, now_score, now_user, head_master, biggest_player)
 
             # 游戏结束
             if _if_game_over != 0:
