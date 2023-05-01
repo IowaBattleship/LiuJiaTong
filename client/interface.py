@@ -1,55 +1,328 @@
-def print_cards(cards):
+import os
+from typing import List
+
+def columns(string: str) -> int:
+    columns = 0
+    for ch in string:
+        if '\u4e00' <= ch <= '\u9fff':
+            columns += 2 #中文字符占两格
+        else:
+            columns += 1
+    return columns
+class Sentence:
+    """
+    打印的切片数据
+    :string : 打印的字符串（不带控制序列字符）
+    :highlight : 是否要高亮版的字符串
+    :color : 如果color为0则打印白色字符，否则打印对应的颜色的字符，控制序列格式串为f'\\x1b[{color}m'
+    :blink : 是否需要闪烁字符串
+    :underline : 是否需要对字符串添加下划线
+    """
+    def __init__(self):
+        self.string: str = ""
+        self.highlight: bool = False
+        self.color: int = 0
+        self.blink: bool = False
+        self.underline: bool = False
+
+    def __str__(self):
+        return self.string
+    
+    def columns(self) -> int:
+        return columns(self.string)
+    
+    def gen_print(self) -> str:
+        print_str = ""
+        # 打印控制序列字符
+        if self.highlight:
+            print_str += '\x1b[1m'
+        if self.color > 0:
+            print_str += f'\x1b[{self.color}m'
+        if self.blink:
+            print_str += '\x1b[5m'
+        if self.underline:
+            print_str += '\x1b[4m'
+        # 打印字符串
+        print_str += self.string
+        # 清除格式
+        print_str += '\x1b[0m'
+        return print_str
+    def gen_csi(self) -> str:
+        print_str = ""
+        if self.highlight:
+            print_str += '\x1b[1m'
+        if self.color > 0:
+            print_str += f'\x1b[{self.color}m'
+        if self.blink:
+            print_str += '\x1b[5m'
+        if self.underline:
+            print_str += '\x1b[4m'
+        return print_str
+
+Paragraph = List[Sentence]
+Chapter = List[Paragraph]
+Article = List[Chapter]
+
+def clear_screen():
+    print('\x1b[2J\x1b[H', end='')
+
+def print_hline(term_column: int):
+    assert(term_column >= 2)
+    print('+', '-' * (term_column - 2), '+', sep='')
+
+def paragraph_columns(paragraph: Paragraph) -> int:
+    assert(len(paragraph) > 0)
+    columns = len(paragraph) - 1 #中间用空格隔开
+    for sentence in paragraph:
+        columns += sentence.columns()
+    return columns
+
+def print_paragraph(paragraph: Paragraph, term_column: int):
+    assert(len(paragraph) > 0)
+    assert(term_column >= 4)
+    line_begin = False
+    line_end = False
+    now_column = 0 
+    max_column = term_column - 2 
+    for sentence in paragraph:
+        printed = False
+        while not printed:
+            if not line_begin:
+                print('|', end='')
+                line_begin = True
+                line_end = False
+            else:
+                if now_column < max_column:
+                    print(' ', end='')
+                    now_column += 1
+                else:
+                    print('|\n|',end='')
+                    now_column = 0
+            
+            if now_column + sentence.columns() > max_column:
+                if now_column > 0:
+                    print(' ' * (max_column - now_column), '|', sep='')
+                    assert(not line_end)
+                    line_begin = False
+                    line_end = True
+                    now_column = 0
+                else:
+                    csi_flag = False
+                    for ch in sentence.gen_print():
+                        if ch == '\x1b':
+                            csi_flag = True
+                        if csi_flag:
+                            print(ch, end='')
+                            if 'A' <= ch <= 'Z' or 'a' <= ch <= 'z': #这里简单判了，不是很标准
+                                csi_flag = False
+                            continue
+                        if now_column + columns(ch) > max_column:
+                            print(' ' * (max_column - now_column), '\x1b[0m', '|', sep='')
+                            print('|', sentence.gen_csi(), ch, sep='', end='')
+                            now_column = columns(ch)
+                        else:
+                            print(ch, end='')
+                            now_column += columns(ch)
+                    printed = True
+            else:
+                print(sentence.gen_print(), end='')
+                now_column += sentence.columns()    
+                printed = True        
+    if not line_end:
+        print(' ' * (max_column - now_column), '|', sep='')
+
+def gen_help_chapter() -> Chapter:
+    chapter = []
+    
+    def gen_paragraph(string: str) -> Paragraph:
+        sentence = Sentence()
+        sentence.string = string
+        return [sentence]
+    chapter.append(gen_paragraph("B 代表 10"))
+    chapter.append(gen_paragraph("0 代表 小王"))
+    chapter.append(gen_paragraph("1 代表 大王"))
+
+    '''
+    help_tab之后考虑做一下，
+    就是用户摁tab键一键补全同类型的牌
+    '''
+
+    return chapter
+
+def gen_score_chapter(
+    now_score: int,
+    client_player: int,
+    users_score
+) -> Chapter :
+    chapter = []
+
+    def gen_field_score() -> Paragraph:
+        score_on_field = Sentence()
+        score_on_field.string = f'当前场上分数:{now_score}'
+        return [score_on_field]
+    chapter.append(gen_field_score())
+
+    def gen_team_score() -> Paragraph:
+        paragraph = []
+        
+        own_score = Sentence()
+        score = 0
+        for i in range(6):
+            if i % 2 == client_player % 2:
+                score += users_score[i]
+        own_score.string = f'己方得分:{score}'
+        own_score.highlight = True
+        own_score.color = 32
+        paragraph.append(own_score)
+
+        opp_score = Sentence()
+        score = 0
+        for i in range(6):
+            if i % 2 != client_player % 2:
+                score += users_score[i]
+        opp_score.string = f'对方得分:{score}'
+        opp_score.highlight = True
+        opp_score.color = 31
+        paragraph.append(opp_score)
+        return paragraph
+    chapter.append(gen_team_score())
+
+    return chapter
+    
+
+def gen_cards_string(cards):
+    string = ''
     for i in range(len(cards)):
         if i != 0 and cards[i] != cards[i - 1]:
-            print(' ', end='')
-        print(cards[i], end='')
+            string += ' '
+        string += cards[i]
+    return string
 
+def gen_player_paragraph(
+    name: str,
+    name_maxlen: int,
+    num_of_cards: int,
+    score: int,
+    played_cards,
+    is_current_player: bool,
+    is_head_master: bool,
+    is_same_team: bool,
+    is_biggest_player: bool
+) -> Paragraph:
+    paragraph = []
 
-def main_interface(users_name, tag, users_score, users_cards_len,
-                   played_cards, user, now_score, now_user, head_master):
-    print(f'\n\n当前场上分数：{now_score}')
-
-    # 输出其它玩家
-    i = (tag + 1) % 6
-    while i != tag:
-        if i % 2 != tag % 2:
-            print('      {0:<20}{1:>4}张{2:>5}分'.format(users_name[i], users_cards_len[i], users_score[i]), end='')
-        else:
-            print('(Team){0:<20}{1:>4}张{2:>5}分'.format(users_name[i], users_cards_len[i], users_score[i]), end='')
-
-        if i == head_master:
-            print('{0:^6}'.format('头科'), end='')
-        else:
-            print('      ', end='')
-
-        if i == now_user:
-            print('<<<NOW ROUND<<<', end='')
-
-        if len(played_cards[i]) != 0:
-            print_cards(played_cards[i])
-
-        i = (i + 1) % 6
-        print()
-
-    # 输出自己
-    print('------------------------\n')
-    print('(Team){0:<20}{1:>4}张{2:>5}分'.format(user.name, len(user.cards), user.score), end='')
-
-    if tag == head_master:
-        print('{0:^6}'.format('头科'), end='')
+    player_name = Sentence()
+    player_name.highlight = True
+    # 如果是同一队的，就用绿色输出，否则用红色
+    if is_same_team:
+        player_name.color = 32
     else:
-        print('      ', end='')
+        player_name.color = 31
+    # 如果该玩家现在在打牌，则将其名字闪烁显示
+    if is_current_player:
+        player_name.blink = True
+    # 如果当前玩家是头科，则在其前面写上
+    if is_head_master:
+        player_name.string += '头科 '
+    else:
+        player_name.string += '     '
+    # 输出名字
+    player_name.string += f'{name:<{name_maxlen}}'
+    paragraph.append(player_name)
 
-    if tag == now_user:
-        print('<<<NOW ROUND<<<', end='')
+    player_score = Sentence()
+    player_score.highlight = True
+    # 如果是同一队的，就用绿色输出，否则用红色
+    if is_same_team:
+        player_score.color = 32
+    else:
+        player_score.color = 31
+    player_score.string += f'{num_of_cards:>2}张{score:>3}分'
+    paragraph.append(player_score)
 
-    if len(user.played_card) != 0:
-        print_cards(user.played_card)
+    player_played = Sentence()
+    if is_biggest_player:
+        player_played.underline = True
+    player_played.string += gen_cards_string(played_cards)
+    paragraph.append(player_played)
 
-    print('\n')
-    print('                                     ', end='')
-    print_cards(user.cards)
-    print()
+    return paragraph
+
+def gen_cards_chapter(cards) -> Chapter:
+    chapter = []
+
+    def gen_paragraph(string: str) -> Paragraph:
+        sentence = Sentence()
+        sentence.string = string
+        return [sentence]
+    chapter.append(gen_paragraph("你的手牌:"))
+    chapter.append(gen_paragraph(gen_cards_string(cards)))
+
+    return chapter
+    
+def main_interface(users_name, client_player, users_score, users_cards_len,
+                   played_cards, user, now_score, now_user, head_master, biggest_player):
+    clear_screen()
+    # 输出帮助
+    help_chapter = gen_help_chapter()
+    # 输出得分
+    score_chapter = gen_score_chapter(now_score, client_player, users_score)
+
+    name_maxlen = 8
+    for i in range(6):
+        name_maxlen = max(name_maxlen, columns(users_name[i]))
+    # 输出其它玩家
+    other_player_chapter = []
+    client_player_chapter = []
+    for i in range(0, 6):
+        player = (client_player + i + 1) % 6
+        player_paragraph = gen_player_paragraph(
+            name=users_name[player],
+            name_maxlen=name_maxlen,
+            num_of_cards=users_cards_len[player],
+            score=users_score[player],
+            played_cards=played_cards[player],
+            is_current_player=(player == now_user),
+            is_head_master=(player == head_master),
+            is_same_team=(player % 2 == client_player % 2),
+            is_biggest_player=(player == biggest_player)
+        )
+        if player == client_player:
+            client_player_chapter.append(player_paragraph)
+        else:
+            other_player_chapter.append(player_paragraph)
+
+    cards_chapter = gen_cards_chapter(user.cards)
+
+    """
+    一共五部分，从上到下依次为
+    1. 帮助注释
+    2. 得分
+    3. 其他玩家信息
+    4. 自己信息
+    5. 手牌
+    """
+    article = [
+        help_chapter,
+        score_chapter,
+        other_player_chapter,
+        client_player_chapter,
+        cards_chapter,
+    ]
+    # 统计最终的终端列数
+    term_column = 0
+    for chapter in article:
+        for paragraph in chapter:
+            term_column = max(term_column, paragraph_columns(paragraph))
+    term_column += 2
+    term_column = min(term_column, os.get_terminal_size().columns - 1)
+
+    # 最后的输出
+    for chapter in article:
+        print_hline(term_column)
+        for paragraph in chapter:
+            print_paragraph(paragraph, term_column)
+    print_hline(term_column)
 
 
 def game_over_interface(tag, _if_game_over):
