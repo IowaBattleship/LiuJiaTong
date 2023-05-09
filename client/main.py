@@ -2,10 +2,10 @@ import json
 import socket
 import struct
 import time
+import utils
 from userinfo import UserInfo
 from interface import main_interface, game_over_interface
-import utils
-from playingrules import if_input_legal
+from playing_handler import playing
 
 RECV_LEN = 1024
 HEADER_LEN = 4
@@ -100,26 +100,7 @@ class Client:
             # 轮到出牌
             if tag == now_user:
                 last_user = utils.last_played(played_cards, tag)
-
-                while True:
-                    user_input = input('请输入要出的手牌(\'B\'表示10，\'0\'\'1\'分别表示小王大王，\'F\'表示跳过)：\n')
-                    user_input = [utils.str_to_int(c) for c in user_input.upper()]
-                    _if_input_legal, score = if_input_legal(user_input,
-                                                            [utils.str_to_int(c) for c in user.cards],
-                                                            last_user == tag,
-                                                            [utils.str_to_int(c) for c in played_cards[last_user]])
-                    # 若合法则累加分数，并从手牌中删除打出的牌
-                    if _if_input_legal is True:
-                        user_input = [utils.int_to_str(c) for c in user_input]
-                        user.played_card = user_input
-                        now_score += score
-                        # print(now_score)
-                        if user_input[0] != 'F':  # 不为skip
-                            for x in user_input:
-                                user.cards.remove(x)
-                        break
-
-                    print('不合法的输入，请重新输入')
+                now_score += playing(user, last_user, tag, played_cards)                
 
                 # 向server发送打出牌或skip的信息
                 data = json.dumps(user.cards).encode()
