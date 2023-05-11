@@ -142,11 +142,6 @@ def gen_help_chapter() -> Chapter:
     chapter.append(gen_paragraph("0 代表 小王  1 代表 大王"))
     chapter.append(gen_paragraph("tab键 补全牌  C键 清空手中的牌"))
 
-    '''
-    help_tab之后考虑做一下，
-    就是用户摁tab键一键补全同类型的牌
-    '''
-
     return chapter
 
 def gen_score_chapter(
