@@ -269,7 +269,7 @@ class Handler(BaseRequestHandler):
 
 
 if __name__ == '__main__':
-    server = ThreadingTCPServer(('127.0.0.1', 8080), Handler)
+    server = ThreadingTCPServer(('0.0.0.0', 8080), Handler)
     print("Listening")
     server.serve_forever()
     # init_cards()
