@@ -23,7 +23,7 @@ def show_playingcards(
     # 最后刷新print的缓冲区
     sys.stdout.flush()
     
-class Special_Input(Enum):
+class SpecialInput(Enum):
     left_arrow = 0
     right_arrow = 1
     backspace = 2
@@ -50,9 +50,9 @@ if os.name == 'posix':
         else:
             dir = read_byte()
             if dir == 'D':
-                return Special_Input.left_arrow
+                return SpecialInput.left_arrow
             elif dir == 'C':
-                return Special_Input.right_arrow
+                return SpecialInput.right_arrow
             else:
                 raise InputException('(非法输入)')
     
@@ -62,7 +62,7 @@ if os.name == 'posix':
             # 判断是否是左右方向键
             return read_direction()
         elif fst_byte == '\x7f':
-            return Special_Input.backspace
+            return SpecialInput.backspace
         elif fst_byte in ['\n', '\t', 'C', 'F']:
             return fst_byte
         elif utils.str_to_int(fst_byte) != -1:
@@ -82,9 +82,9 @@ elif os.name == 'nt':
     def read_direction():
         dir = read_byte()
         if dir == 'K':
-            return Special_Input.left_arrow
+            return SpecialInput.left_arrow
         elif dir == 'M':
-            return Special_Input.right_arrow
+            return SpecialInput.right_arrow
         else:
             raise InputException('(非法输入)')
     
@@ -94,7 +94,7 @@ elif os.name == 'nt':
             return read_direction()
         fst_byte = fst_byte.upper()
         if fst_byte == '\x08':
-            return Special_Input.backspace
+            return SpecialInput.backspace
         elif fst_byte in ['\r', '\t', 'C', 'F']:
             return fst_byte
         elif utils.str_to_int(fst_byte) != -1:
@@ -112,13 +112,13 @@ def read_userinput(
         end_input = False
         try:
             input = read_input()
-            if input == Special_Input.left_arrow:
+            if input == SpecialInput.left_arrow:
                 if cursor > 0:
                     cursor -= 1
-            elif input == Special_Input.right_arrow:
+            elif input == SpecialInput.right_arrow:
                 if cursor < len(now_played_cards):
                     cursor += 1
-            elif input == Special_Input.backspace:
+            elif input == SpecialInput.backspace:
                 if cursor > 0:
                     now_played_cards = now_played_cards[:cursor - 1] + now_played_cards[cursor:]
                     cursor -= 1

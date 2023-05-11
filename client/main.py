@@ -10,12 +10,69 @@ from playing_handler import playing
 RECV_LEN = 1024
 HEADER_LEN = 4
 
+CONFIG_NAME = 'LiuJiaTong.json'
+
 user = UserInfo()
 
+class Config:
+    def __init__(self, ip, port, name):
+        self.ip = ip
+        self.port = port
+        self.name = name
 
 class Client:
     def __init__(self):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def get_config(self):
+        try:
+            with open(CONFIG_NAME, "r") as file:
+                data = json.load(file)
+                self.config = Config(data["ip"], int(data["port"]), data["name"])
+        except:
+            if hasattr(self, "config"):
+                del self.config
+
+        if hasattr(self, "config"):
+            print("已经检测到之前输入的配置，配置如下:")
+        
+        while True:
+            if hasattr(self, "config"):
+                print(f"IP地址: {self.config.ip}")
+                print(f"端口:   {self.config.port}")
+                print(f"用户名: {self.config.name}")
+                print(f"是否使用配置？[Y/n]: ", end='')
+                while True:
+                    resp = input().upper()
+                    if resp in ['', 'Y']:
+                        break
+                    elif resp == 'N':
+                        del self.config
+                        break
+                    else:
+                        print(f"非法输入: ", end='')
+            
+            if hasattr(self, "config"):
+                break
+            
+            while True:
+                ip = input(f"请输入IP地址: ")
+                port = input(f"请输入端口: ")
+                name = input(f"请输入用户名: ")
+                try:
+                    self.config = Config(ip, int(port), name)
+                except:
+                    print(f"输入有误，请重新输入")
+                else:
+                    with open(CONFIG_NAME, "w") as file:
+                        data = {
+                            "ip": self.config.ip,
+                            "port": self.config.port,
+                            "name": self.config.name
+                        }
+                        json.dump(data, file)
+                    print('')
+                    break
 
     def connect(self, server_ip='127.0.0.1', server_port=8080):
         if_connected = False
@@ -35,7 +92,7 @@ class Client:
         self.client.close()
 
     def run(self):
-        user.input_name()
+        user.name = client.config.name
         try:
             self.client.sendall(user.name.encode())
         except Exception as e:
@@ -126,15 +183,9 @@ class Client:
             # print(now_score)
             # print(now_user)
 
-
 if __name__ == '__main__':
-    _ip = input('请输入服务器IP，输入\'127\'则设置为默认本机IP与端口：')
-    if _ip == '127':
-        _ip = '127.0.0.1'
-        _port = 8080
-    else:
-        _port = int(input('请输入服务器端口：'))
     client = Client()
-    client.connect(_ip, _port)
+    client.get_config()
+    client.connect(client.config.ip, client.config.port)
     client.run()
     client.close()
