@@ -12,8 +12,6 @@ HEADER_LEN = 4
 
 CONFIG_NAME = 'LiuJiaTong.json'
 
-user = UserInfo()
-
 class Config:
     def __init__(self, ip, port, name):
         self.ip = ip
@@ -23,6 +21,17 @@ class Config:
 class Client:
     def __init__(self):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.user = UserInfo()
+
+        self.tag = 0 # 用户标识
+        self.users_name = [] # 用户名字
+        self.game_over = 0 # 游戏结束标志，非0代表已经结束
+        self.now_score = 0 # 场上的分数
+        self.now_user = 0 # 当前的用户
+        self.cards_num = [] # 用户牌数
+        self.users_score = [] # 用户分数
+        self.played_cards = [] # 场上的牌
+        self.head_master = 0 # 头科
 
     def get_config(self):
         try:
@@ -90,98 +99,72 @@ class Client:
 
     def close(self):
         self.client.close()
+    
+    def send_data(self, data):
+        data = json.dumps(data).encode()
+        header = struct.pack('i', len(data))
+        self.client.sendall(header)
+        self.client.sendall(data)
+    
+    def recv_data(self):
+        header = self.client.recv(HEADER_LEN)
+        header = struct.unpack('i', header)[0]
+        data = self.client.recv(header)
+        data = json.loads(data.decode())
+        return data
+    
+    # 接收场上信息
+    def recv_card_info(self):
+        self.game_over = self.recv_data()
+        
+        self.users_score = self.recv_data()
+        self.user.score = self.users_score[self.tag]
+        
+        self.cards_num = self.recv_data()
+        
+        self.played_cards = self.recv_data()
+        self.user.played_card = self.played_cards[self.tag]
+
+        self.user.cards = self.recv_data()
+
+        self.now_score = self.recv_data()
+
+        self.now_user = self.recv_data()
+
+        self.head_master = self.recv_data()
+    
+    # 向server发送打出牌或skip的信息
+    def send_card_info(self):
+        self.send_data(self.user.cards)
+        self.send_data(self.user.played_card)
+        self.send_data(self.now_score)
 
     def run(self):
-        user.name = client.config.name
-        try:
-            self.client.sendall(user.name.encode())
-        except Exception as e:
-            print(e)
-            return
+        self.user.name = client.config.name
+        self.send_data(self.user.name)
 
         # 接收username, tag
-        header = self.client.recv(HEADER_LEN)
-        header = struct.unpack('i', header)[0]
-        users_name = json.loads(self.client.recv(header).decode())
-
-        header = self.client.recv(HEADER_LEN)
-        header = struct.unpack('i', header)[0]
-        tag = int(self.client.recv(header).decode())
+        self.users_name = self.recv_data()
+        self.tag = self.recv_data()
 
         while True:
-            # 接收场上信息
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            _if_game_over = int(self.client.recv(header).decode())
+            self.recv_card_info()
+            biggest_player = utils.last_played(self.played_cards, self.now_user)
 
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            users_score = json.loads(self.client.recv(header).decode())
-            user.score = users_score[tag]
-
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            users_cards_len = json.loads(self.client.recv(header).decode())
-
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            played_cards = json.loads(self.client.recv(header).decode())
-            user.played_card = played_cards[tag]
-
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            user.cards = json.loads(self.client.recv(header).decode())
-
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            now_score = int(self.client.recv(header).decode())
-
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            now_user = int(self.client.recv(header).decode())
-
-            header = self.client.recv(HEADER_LEN)
-            header = struct.unpack('i', header)[0]
-            head_master = int(self.client.recv(header).decode())
-
-            biggest_player = utils.last_played(played_cards, now_user)
-
-            main_interface(users_name, tag, users_score, users_cards_len, played_cards,
-                           user, now_score, now_user, head_master, biggest_player)
+            main_interface(self.users_name, self.tag, self.users_score, self.cards_num, self.played_cards,
+                           self.user, self.now_score, self.now_user, self.head_master, biggest_player)
 
             # 游戏结束
-            if _if_game_over != 0:
-                game_over_interface(tag, _if_game_over)
+            if self.game_over != 0:
+                game_over_interface(self.tag, self.game_over)
                 return
 
             # 轮到出牌
-            if tag == now_user:
-                last_user = utils.last_played(played_cards, tag)
-                now_score += playing(user, last_user, tag, played_cards)                
-
-                # 向server发送打出牌或skip的信息
-                data = json.dumps(user.cards).encode()
-                header = struct.pack('i', len(data))
-                self.client.sendall(header)
-                self.client.sendall(data)
-
-                data = json.dumps(user.played_card).encode()
-                header = struct.pack('i', len(data))
-                self.client.sendall(header)
-                self.client.sendall(data)
-
-                data = str(now_score).encode()
-                header = struct.pack('i', len(data))
-                self.client.sendall(header)
-                self.client.sendall(data)
-
-            # print(users_name)
-            # print(users_score)
-            # print(users_cards_len)
-            # print(played_cards)
-            # print(user.cards)
-            # print(now_score)
-            # print(now_user)
+            if self.tag == self.now_user:
+                last_user = utils.last_played(self.played_cards, self.tag)
+                self.now_score += playing(self.user, last_user, self.tag, self.played_cards)                
+                self.send_card_info()
+                
 
 if __name__ == '__main__':
     client = Client()
