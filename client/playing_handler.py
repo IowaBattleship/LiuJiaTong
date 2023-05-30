@@ -1,6 +1,10 @@
 import utils
+import socket 
 import os
 import sys
+import time
+import select
+import psutil
 from enum import Enum
 from playingrules import if_input_legal
 from userinfo import UserInfo
@@ -34,6 +38,8 @@ class InputException(Exception):
     def __str__(self):
         return repr(self.value)
 
+g_client_socket = socket.socket()
+
 # io系列函数
 # now_played_cards: 用户已经输入好的字符串
 # cursor: 光标位置
@@ -42,6 +48,10 @@ class InputException(Exception):
 if os.name == 'posix':
     # linux & mac
     def read_byte() -> str:
+        while select.select([sys.stdin], [], [], 0) == ([], [], []):
+            if g_client_socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO) != 1:
+                raise RuntimeError()
+            time.sleep(0.05)
         return sys.stdin.read(1)
 
     def read_direction():
@@ -72,11 +82,21 @@ if os.name == 'posix':
     
 elif os.name == 'nt':
     # windows
-    from msvcrt import getch
+    from msvcrt import getch, kbhit
     def read_byte() -> str:
+        while not kbhit():
+            def check_tcp():
+                raddr = g_client_socket.getpeername()
+                connections = psutil.net_connections('tcp')
+                for conn in connections:
+                    if conn.raddr == raddr:
+                        if conn.status == 'ESTABLISHED':
+                            return True
+                return False
+            if not check_tcp():
+                raise RuntimeError()
+            time.sleep(0.05)
         char = chr(getch()[0])
-        if char == '\x03': # ctrl + C
-            raise KeyboardInterrupt()
         return char
         
     def read_direction():
@@ -164,12 +184,16 @@ def read_userinput(
 # last_user: 最后打出牌的用户
 # client_user: 客户端正在输入的用户
 # played_cards: 场上所有牌信息
+# client: 客户端socket，用于检测远端是否关闭了
 def playing(
     user: UserInfo,
     last_user: int,
     client_user: int,
-    played_cards
+    played_cards,
+    client_socket
 ) -> int:
+    global g_client_socket
+    g_client_socket = client_socket
     print('请输入要出的手牌(\'F\'表示跳过):')
     # 保存当前光标位置
     print('\x1b[s',end='')

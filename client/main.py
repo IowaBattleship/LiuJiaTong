@@ -164,7 +164,7 @@ class Client:
             # 轮到出牌
             if self.is_player and self.tag == self.now_user:
                 last_user = utils.last_played(self.played_cards, self.tag)
-                self.now_score += playing(self.user, last_user, self.tag, self.played_cards)                
+                self.now_score += playing(self.user, last_user, self.tag, self.played_cards, self.client)                
                 self.send_card_info()
                 
 
