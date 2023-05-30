@@ -23,6 +23,7 @@ class Client:
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.user = UserInfo()
 
+        self.is_player = False # 玩家/旁观者
         self.tag = 0 # 用户标识
         self.users_name = [] # 用户名字
         self.game_over = 0 # 游戏结束标志，非0代表已经结束
@@ -143,7 +144,8 @@ class Client:
         self.user.name = client.config.name
         self.send_data(self.user.name)
 
-        # 接收username, tag
+        # 接收用户信息
+        self.is_player = self.recv_data()
         self.users_name = self.recv_data()
         self.tag = self.recv_data()
 
@@ -160,7 +162,7 @@ class Client:
                 return
 
             # 轮到出牌
-            if self.tag == self.now_user:
+            if self.is_player and self.tag == self.now_user:
                 last_user = utils.last_played(self.played_cards, self.tag)
                 self.now_score += playing(self.user, last_user, self.tag, self.played_cards)                
                 self.send_card_info()

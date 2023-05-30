@@ -1,5 +1,6 @@
 import json
 import random
+import sys
 import struct
 import threading
 import time
@@ -23,16 +24,22 @@ class Game_Var:
         self.team_out = [0, 0]  # 各队逃出人数
         self.game_over = 0 # 游戏结束状态
     def __init__(self) -> None:
+        # 用户登录
         self.users_name = []
         self.users_name_lock = threading.Lock()
         self.user_join_barrier = threading.Barrier(6)
-
+        # 牌局变量
         self.init_game_env()
-        
-        self.finish_sending_user_barrier = threading.Barrier(6)
-        self.finish_sending_card_barrier = threading.Barrier(6)
+        # 玩家
+        self.player_sending_card_barrier = threading.Barrier(6)
         self.before_playing_barrier = threading.Barrier(6)
         self.after_playing_barrier = threading.Barrier(6)
+        # 旁观者
+        self.bystander_lock = threading.Lock()
+        self.bystander_number = 0
+        self.bystander_finish_sending_num = 0
+        self.bystander_start_sending_card_event = threading.Event()
+        self.bystander_finish_sending_card_event = threading.Event()
 
 gvar = Game_Var()
     
@@ -84,6 +91,9 @@ def set_next_player():
         gvar.now_user = (gvar.now_user + 1) % 6
 
 def before_playing():
+    # 如果游戏结束了就直接退出，不参与之后的结算
+    if gvar.game_over != 0:
+        return
     # 玩家是否打完所有的牌
     # 不在打完之后马上结算是因为玩家的分没拿
     # 考虑到有多个人同时打完牌的情况，得用循环
@@ -142,7 +152,6 @@ def after_playing():
     set_next_player()
 
 class Game_Handler(BaseRequestHandler):
-    
     def send_data(self, data):
         data = json.dumps(data).encode()
         header = struct.pack('i', len(data))
@@ -157,83 +166,67 @@ class Game_Handler(BaseRequestHandler):
         return data
 
     # 将username, tag发送给客户端
-    def send_users_info(self, tag):
-        while True:
-            try:
-                # 用户名
-                users_name = [user_name for user_name, _ in gvar.users_name]
-                self.send_data(users_name)
-                # 用户标识号
-                self.send_data(tag)
-                break
-            except Exception as e:
-                print(e)
-                time.sleep(1)
+    def send_user_info(self, tag, is_player):
+        # 玩家/旁观者
+        self.send_data(is_player)
+        # 用户名
+        users_name = [user_name for user_name, _ in gvar.users_name]
+        self.send_data(users_name)
+        # 用户标识号
+        self.send_data(tag)
     
     def send_cards_info(self, tag):
-        while True:
-            try:
-                # 游戏结束
-                self.send_data(gvar.game_over)
-                # 用户得分
-                self.send_data(gvar.users_score)
-                # 用户手牌数
-                self.send_data([len(x) for x in gvar.users_cards])
-                # 场上手牌
-                self.send_data(gvar.played_cards)
-                # 当前用户手牌
-                self.send_data(gvar.users_cards[tag])
-                # 场上得分
-                self.send_data(gvar.now_score)
-                # 当前玩家
-                self.send_data(gvar.now_user)
-                # 头科
-                self.send_data(gvar.head_master)
-                break
-            except Exception as e:
-                print(e)
-                time.sleep(1)
-    
+        # 游戏结束
+        self.send_data(gvar.game_over)
+        # 用户得分
+        self.send_data(gvar.users_score)
+        # 用户手牌数
+        self.send_data([len(x) for x in gvar.users_cards])
+        # 场上手牌
+        self.send_data(gvar.played_cards)
+        # 当前用户手牌
+        self.send_data(gvar.users_cards[tag])
+        # 场上得分
+        self.send_data(gvar.now_score)
+        # 当前玩家
+        self.send_data(gvar.now_user)
+        # 头科
+        self.send_data(gvar.head_master)
+    # 接受用户输入
     def recv_player_reply(self):
         user_cards = self.recv_data()
         played_cards = self.recv_data()
         now_score = self.recv_data()
         return user_cards, played_cards, now_score
-        
-    def handle(self):
-        address, pid = self.client_address
-        print(f'{address} connected, pid = {pid}')
-        
-        # recv username
-        with gvar.users_name_lock:
-            user_idx = len(gvar.users_name)
-            user_name = self.recv_data()
-            gvar.users_name.append((user_name, pid))
-            print(gvar.users_name)
-        
-        if user_idx < 6:
-            if user_idx == 0:  # 该线程作为发牌手
-                start_game()
-            gvar.user_join_barrier.wait()  # 等待其它玩家
-            if user_idx == 0:
-                gvar.user_join_barrier.reset()
-        else:
-            assert(0)
-
-        # 找到该线程对应的玩家下标
-        tag = next((i for i, (_, user_pid) in enumerate(gvar.users_name) if pid == user_pid), 0)
-
-        if tag == 0:
-            print(gvar.users_cards)
-
-        self.send_users_info(tag)
-        gvar.finish_sending_user_barrier.wait()
-        if user_idx == 0:
-            gvar.finish_sending_user_barrier.reset()
-
+    # 旁观者运行函数
+    def bystander_handle(self, tag):
+        with gvar.bystander_lock:
+            gvar.bystander_number += 1
+        while True:
+            gvar.bystander_start_sending_card_event.wait()
+            self.send_cards_info(tag)
+            gvar.bystander_finish_sending_num += 1
+            gvar.bystander_finish_sending_card_event.wait()
+    # 让旁观者发送手牌
+    def active_bystander(self):
+        with gvar.bystander_lock:
+            gvar.bystander_finish_sending_num = 0
+            # 阻塞出口
+            gvar.bystander_finish_sending_card_event.clear()
+            # 开始让旁观者发送信息
+            gvar.bystander_start_sending_card_event.set()
+            # 确保所有旁观者都发送完信息
+            while gvar.bystander_finish_sending_num < gvar.bystander_number:
+                time.sleep(0.1)
+            # 阻塞入口
+            gvar.bystander_start_sending_card_event.clear()
+            # 让旁观者线程进入到下一个循环
+            gvar.bystander_finish_sending_card_event.set()
+    # 玩家运行函数
+    def player_handle(self, tag):
         while True:
             # 打牌前的处理
-            if user_idx == 0:
+            if tag == 0:
                 before_playing()
                 gvar.before_playing_barrier.wait()
                 gvar.before_playing_barrier.reset()
@@ -242,10 +235,23 @@ class Game_Handler(BaseRequestHandler):
                 
             # 将手牌等信息发送至各客户端
             now_user = gvar.now_user
+            # 让旁观者发送手牌
+            active_t = threading.Thread(target=self.active_bystander)
+            if tag == 0:
+                active_t.start()
+            # 输出自己手牌
             self.send_cards_info(tag)
-            gvar.finish_sending_card_barrier.wait()
-            if user_idx == 0:
-                gvar.finish_sending_card_barrier.reset()
+            # 等待旁观者
+            if tag == 0:
+                active_t.join()
+            gvar.player_sending_card_barrier.wait()
+            if tag == 0:    
+                gvar.player_sending_card_barrier.reset()
+            
+            # 如果游戏结束了直接退，不含糊
+            if gvar.game_over:
+                time.sleep(5)
+                sys.exit(0)
             
             # 非此轮的线程阻塞等待
             # 这里另起局部变量判断而不是用全局变量是因为now_user可能在tag用户的操作下发生变化
@@ -264,8 +270,39 @@ class Game_Handler(BaseRequestHandler):
                 after_playing()
                 gvar.after_playing_barrier.wait()
                 gvar.after_playing_barrier.reset()
+        
+    def handle(self):
+        address, pid = self.client_address
+        print(f'{address} connected, pid = {pid}')
+        
+        # recv username
+        with gvar.users_name_lock:
+            user_idx = len(gvar.users_name)
+            user_name = self.recv_data()
+            if user_idx == 6:
+                is_player = False
+                print(f"{user_name} joined game. It is a bystander")
+            else:
+                is_player = True
+                gvar.users_name.append((user_name, pid))
+                print(f"{user_name} joined game. It is a gamer")
 
+        if is_player:
+            if user_idx == 5:  # 该线程作为发牌手
+                start_game()
+            gvar.user_join_barrier.wait()  # 等待其它玩家
+            if user_idx == 5:
+                gvar.user_join_barrier.reset()
+            # 找到该线程对应的玩家下标
+            tag = next((i for i, (_, user_pid) in enumerate(gvar.users_name) if pid == user_pid), 0)
 
+            self.send_user_info(tag, is_player)
+            self.player_handle(tag)
+        else:
+            tag = random.randint(0, 5)
+
+            self.send_user_info(tag, is_player)
+            self.bystander_handle(tag)
 
 if __name__ == '__main__':
     server = ThreadingTCPServer(('0.0.0.0', 8080), Game_Handler)
