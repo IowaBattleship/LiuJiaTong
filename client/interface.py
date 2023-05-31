@@ -139,13 +139,8 @@ def gen_help_chapter() -> Chapter:
         sentence.string = string
         return [sentence]
     chapter.append(gen_paragraph("B 代表 10"))
-    chapter.append(gen_paragraph("0 代表 小王"))
-    chapter.append(gen_paragraph("1 代表 大王"))
-
-    '''
-    help_tab之后考虑做一下，
-    就是用户摁tab键一键补全同类型的牌
-    '''
+    chapter.append(gen_paragraph("0 代表 小王  1 代表 大王"))
+    chapter.append(gen_paragraph("tab键 补全牌  C键 清空手中的牌"))
 
     return chapter
 
