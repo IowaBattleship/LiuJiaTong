@@ -287,7 +287,7 @@ def if_triple_pair(cards, card_num, type_num, joker_num):
 
 
 # 判断出牌类型并转换大小王，确认关键牌
-def judge_and_transform_cards(cards):
+def judge_and_transform_cards(cards: list[int]):
     card_num = dict(Counter(cards))  # 统计每种牌有多少张
     type_num = dict(Counter([v for k, v in card_num.items() if k <= 15]))  # 统计除去王牌 相同张数的牌有多少种
 
