@@ -177,7 +177,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     client = Client()
-    if args.ip == None:
+    if args.ip == None or args.port == None or args.user_name == None:
         client.get_config()
     else:
         client.config = Config(args.ip, args.port, args.user_name)
