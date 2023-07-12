@@ -6,6 +6,7 @@ import utils
 from userinfo import UserInfo
 from interface import main_interface, game_over_interface
 from playing_handler import playing
+import argparse
 
 RECV_LEN = 1024
 HEADER_LEN = 4
@@ -169,8 +170,18 @@ class Client:
                 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='启动六家统客户端')
+    parser.add_argument('--ip', type=str, help='ip address')
+    parser.add_argument('--port', type=int, help='port')
+    parser.add_argument('--user-name', type=str, help='user name')
+    args = parser.parse_args()
+
     client = Client()
-    client.get_config()
+    if args.ip == None:
+        client.get_config()
+    else:
+        client.config = Config(args.ip, args.port, args.user_name)
+
     client.connect(client.config.ip, client.config.port)
     client.run()
     client.close()
