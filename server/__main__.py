@@ -1,6 +1,8 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import random
-import sys
 import struct
 import threading
 import time

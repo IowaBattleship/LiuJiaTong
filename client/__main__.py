@@ -1,12 +1,15 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import socket
 import struct
 import time
-import utils
+import argparse
 from userinfo import UserInfo
 from interface import main_interface, game_over_interface
 from playing_handler import playing
-import argparse
+import utils
 
 RECV_LEN = 1024
 HEADER_LEN = 4

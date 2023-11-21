@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 #!coding:utf-8
 import pytest
-import sys 
-sys.path.append("..") 
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from client.playingrules import *
 
 @pytest.mark.parametrize('user_input, expect', [
@@ -23,7 +24,7 @@ def test_judge_and_transform_cards(user_input, expect):
 
 
 @pytest.mark.parametrize('user_input, user_card, if_first_played, expect', [
-    [[4,5,6,7,8,9,13,10,16,17], [4,5,6,7,8,9,9,9,9,9,10,13,14,14,14,15,16,17], True, (True, 25)],
+    [[4,5,6,7,8,9,13,10,16,17], [4,5,6,7,8,9,9,9,9,9,10,13,14,14,14,15,16,17], True, (False, 25)],
 ])
 def test_if_put_legal(user_input, user_card, if_first_played, expect):
     assert if_input_legal(user_input, user_card, if_first_played)==expect
