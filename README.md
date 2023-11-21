@@ -5,7 +5,7 @@ Wenling LiuJiaTong is popular in Wenling area of Taizhou. It consists of 6 peopl
 
 # Get started!
 
-This project is fully implemented using python, just need to start server/main.py on the server, players/onlookers can connect to start game.
+This project is fully implemented using python(>=3.9.0), just need to start server/main.py on the server, players/onlookers can connect to start game.
 
 # Contributions
 
