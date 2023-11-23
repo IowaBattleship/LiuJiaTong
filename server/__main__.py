@@ -8,6 +8,7 @@ import threading
 import time
 from socketserver import BaseRequestHandler, ThreadingTCPServer
 import utils
+import argparse
 
 RECV_LEN = 1024
 HEADER_LEN = 4
@@ -307,6 +308,11 @@ class Game_Handler(BaseRequestHandler):
             self.onlooker_handle(client_player)
 
 if __name__ == '__main__':
-    server = ThreadingTCPServer(('0.0.0.0', 8080), Game_Handler)
+    parser = argparse.ArgumentParser(description='启动六家统服务端')
+    parser.add_argument('--ip', type=str, default='0.0.0.0', help='listening ip (default: %(default)s)')
+    parser.add_argument('--port', type=int, default=8080, help='port (default: %(default)s)')
+    args = parser.parse_args()
+
+    server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
     print("Listening")
     server.serve_forever()
