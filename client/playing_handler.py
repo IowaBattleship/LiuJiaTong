@@ -5,6 +5,7 @@ import sys
 import time
 import select
 import psutil
+import logger
 from enum import Enum
 from playingrules import if_input_legal
 
@@ -211,16 +212,17 @@ def playing(
     else:
         raise RuntimeError('unknow os!') 
 
+    logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
     while True:
         new_played_cards, cursor = read_userinput(new_played_cards, cursor, client_cards)
-        user_input = [utils.str_to_int(c) for c in new_played_cards]
         _if_input_legal, new_score = if_input_legal(
-            user_input,
+            [utils.str_to_int(c) for c in new_played_cards],
             [utils.str_to_int(c) for c in client_cards],
             [utils.str_to_int(c) for c in users_played_cards[last_player]]
                 if last_player != client_player else None
         )
         if _if_input_legal:
+            logger.info(f"now play: {new_played_cards}")
             break
         show_playingcards(new_played_cards, cursor, '(非法牌型)')
 

@@ -9,6 +9,7 @@ import argparse
 from interface import main_interface, game_over_interface
 from playing_handler import playing
 import utils
+import logger
 
 RECV_LEN = 1024
 HEADER_LEN = 4
@@ -39,6 +40,17 @@ class Client:
         self.his_now_score = 0 # 历史场上分数，用于判断是否发生了得分
         self.his_last_player = None # 历史上一个打牌的人，用于判断是否上次发生打牌事件
         self.is_start = False # 记录是否游戏还在开局
+    
+    def take_log(self):
+        logger.info(f"----------new round------------")
+        logger.info(f"cilent_cards: {self.client_cards}")
+        logger.info(f"users_score: {self.users_score}")
+        logger.info(f"users_played_cards: {self.users_played_cards}")
+        logger.info(f"now_player: {self.users_name[self.now_player]}")
+        logger.info(f"now_score: {self.now_score}")
+        logger.info(f"head_master: {self.users_name[self.head_master] if self.head_master != -1 else None}")
+        logger.info(f"his_now_score: {self.his_now_score}")
+        logger.info(f"his_last_player: {self.his_last_player}")
 
     def get_config(self):
         try:
@@ -145,6 +157,10 @@ class Client:
         self.users_name = self.recv_data()
         self.client_player = self.recv_data()
 
+        logger.info(f"is_player: {self.is_player}")
+        logger.info(f"users_name: {self.users_name}")
+        logger.info(f"client_player: {self.client_player}")
+
         while True:
             self.recv_card_info()
             # UI
@@ -166,6 +182,7 @@ class Client:
                 # 历史数据
                 self.his_now_score, self.his_last_player 
             )
+            self.take_log()
             # 记录历史信息
             self.his_now_score = self.now_score
             self.his_last_player = last_player if last_player != self.now_player else None
@@ -189,6 +206,8 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, help='port')
     parser.add_argument('--user-name', type=str, help='user name')
     args = parser.parse_args()
+
+    logger.init_logger()
 
     client = Client()
     if args.ip == None or args.port == None or args.user_name == None:
