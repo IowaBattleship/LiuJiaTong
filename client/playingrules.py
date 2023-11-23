@@ -266,7 +266,7 @@ def if_triple_pair(cards, card_num, type_num, joker_num):
     if (type_num.get(3, 0) == 1 and type_num.get(2, 0) == 1) or \
             (card_num.get(16, 0) == 3 and card_num.get(17, 0) == 2) or \
             (card_num.get(16, 0) == 2 and card_num.get(17, 0) == 3):
-        return 11, find_max_card(card_num, 3, True)
+        return CardType.triple_pair, find_max_card(card_num, 3, True)
     else:
         # 0AABB
         if joker_num == 1 and type_num.get(2, 0) == 2:
@@ -286,6 +286,7 @@ def if_triple_pair(cards, card_num, type_num, joker_num):
 
 # 判断出牌类型并转换大小王，确认关键牌
 def judge_and_transform_cards(cards: list[int]):
+    assert sorted(cards, reverse=True) == cards, cards
     card_num = dict(Counter(cards))  # 统计每种牌有多少张
     type_num = dict(Counter([v for k, v in card_num.items() if k <= 15]))  # 统计除去王牌 相同张数的牌有多少种
 
@@ -392,13 +393,11 @@ def if_not_first_input_legal(user_input, last_played_cards):
 # 判断手中牌是否足够出，并返回输入牌的分数
 def if_enough_card(user_input, user_card):
     input_num = dict(Counter(user_input))  # 统计每种牌有多少张
-    card_num = dict(Counter(user_card))
-    # print(user_input)
-    # print(input_num)
-    # print(card_num)
-    for k, v in input_num.items():
-        if card_num.get(k, 0) < v:
-            return False, 0
+    if user_card is not None:
+        card_num = dict(Counter(user_card))
+        for k, v in input_num.items():
+            if card_num.get(k, 0) < v:
+                return False, 0
     return True, input_num.get(5, 0) * 5 + (input_num.get(10, 0) + input_num.get(13, 0)) * 10
 
 
@@ -406,30 +405,23 @@ def if_enough_card(user_input, user_card):
 def if_input_legal(
     user_input: list[int],
     user_card: list[int],
-    if_first_played=False,
-    last_played_cards: list[int]=None
+    last_played_cards: list[int]
 ):
-    if last_played_cards is None:
-        last_played_cards = []
-
+    assert user_input is not None
     # 判断输入字符是否合法，并判断是否skip
     for x in user_input:
-        if x < 0 or ((if_first_played is True or len(user_input) > 1) and x == 0):
+        if x < 0 or (len(user_input) > 1 and x == 0):
             return False, 0
-    if len(user_input) == 1 and user_input[0] == 0:
-        if if_first_played is False:
-            return True, 0
-        else:
-            return False, 0
+    if user_input == [0]:
+        return last_played_cards is not None, 0
 
     _if_enough, score = if_enough_card(user_input, user_card)
-    
     if _if_enough is False:
         return False, 0
 
-    user_input.sort(reverse=True)
-
-    if if_first_played is True:
-        return if_first_input_legal(user_input), score
+    _user_input = sorted(user_input, reverse=True)
+    if last_played_cards is None:
+        return if_first_input_legal(_user_input), score
     else:
-        return if_not_first_input_legal(user_input, last_played_cards), score
+        _last_played_cards = sorted(last_played_cards, reverse=True)
+        return if_not_first_input_legal(_user_input, _last_played_cards), score

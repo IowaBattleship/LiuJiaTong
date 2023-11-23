@@ -19,9 +19,9 @@ class Game_Var:
         self.user_finished = [False for _ in range(6)] # 玩家打完所有的牌
         self.played_cards = [[] for _ in range(6)]  # 场上所出手牌
         self.now_score = 0  # 场上分数
-        self.now_user = 0  # 当前出牌玩家
+        self.now_player = 0  # 当前出牌玩家
         self.head_master = -1  # 头科玩家下标
-        self.last_played = 0  # 上一位出牌玩家
+        self.last_player = 0  # 上一位出牌玩家
         self.team_score = [0, 0]  # 各队分数
         self.team_out = [0, 0]  # 各队逃出人数
         self.game_over = 0 # 游戏结束状态
@@ -88,9 +88,9 @@ def start_game():
 
 # 下一位玩家出牌
 def set_next_player():
-    gvar.now_user = (gvar.now_user + 1) % 6
-    while gvar.user_finished[gvar.now_user]:
-        gvar.now_user = (gvar.now_user + 1) % 6
+    gvar.now_player = (gvar.now_player + 1) % 6
+    while gvar.user_finished[gvar.now_player]:
+        gvar.now_player = (gvar.now_player + 1) % 6
 
 def before_playing():
     # 如果游戏结束了就直接退出，不参与之后的结算
@@ -99,54 +99,54 @@ def before_playing():
     # 玩家是否打完所有的牌
     # 不在打完之后马上结算是因为玩家的分没拿
     # 考虑到有多个人同时打完牌的情况，得用循环
-    while len(gvar.users_cards[gvar.now_user]) == 0 \
-            and gvar.last_played != gvar.now_user:
-        gvar.user_finished[gvar.now_user] = True
-        gvar.played_cards[gvar.now_user].clear()
+    while len(gvar.users_cards[gvar.now_player]) == 0 \
+            and gvar.last_player != gvar.now_player:
+        gvar.user_finished[gvar.now_player] = True
+        gvar.played_cards[gvar.now_player].clear()
         set_next_player()
     
     # 一轮结束，统计此轮信息
-    if gvar.last_played == gvar.now_user:
+    if gvar.last_player == gvar.now_player:
         # 统计用户分数
-        gvar.users_score[gvar.now_user] += gvar.now_score
+        gvar.users_score[gvar.now_player] += gvar.now_score
         # 队伍有头科，此轮分数直接累加到队伍分数中
-        if gvar.head_master != -1 and gvar.now_user % 2 == gvar.head_master % 2:
-            gvar.team_score[gvar.now_user % 2] += gvar.now_score
+        if gvar.head_master != -1 and gvar.now_player % 2 == gvar.head_master % 2:
+            gvar.team_score[gvar.now_player % 2] += gvar.now_score
         # 若是刚好此轮逃出，此轮分数也直接累加到队伍分数中
-        elif len(gvar.users_cards[gvar.now_user]) == 0:
-            gvar.team_score[gvar.now_user % 2] += gvar.now_score
+        elif len(gvar.users_cards[gvar.now_player]) == 0:
+            gvar.team_score[gvar.now_player % 2] += gvar.now_score
         # 判断游戏是否结束
         gvar.game_over = if_game_over()
         # 初始化场上分数
         gvar.now_score = 0
         # 如果刚好在此轮逃出，第一个出牌的人就要改变
-        if len(gvar.users_cards[gvar.now_user]) == 0:
-            gvar.user_finished[gvar.now_user] = True
-            gvar.played_cards[gvar.now_user].clear()
+        if len(gvar.users_cards[gvar.now_player]) == 0:
+            gvar.user_finished[gvar.now_player] = True
+            gvar.played_cards[gvar.now_player].clear()
             set_next_player()
-            gvar.last_played = gvar.now_user
+            gvar.last_player = gvar.now_player
 
     # 清除当前玩家的场上牌
-    gvar.played_cards[gvar.now_user].clear()
+    gvar.played_cards[gvar.now_player].clear()
 
 def after_playing():
     # skip
-    if gvar.played_cards[gvar.now_user][0] == 'F':
-        gvar.played_cards[gvar.now_user].clear()
+    if gvar.played_cards[gvar.now_player][0] == 'F':
+        gvar.played_cards[gvar.now_player].clear()
     else:
-        gvar.last_played = gvar.now_user
+        gvar.last_player = gvar.now_player
     
     # 此轮逃出，更新队伍信息、头科，判断游戏是否结束
-    if len(gvar.users_cards[gvar.now_user]) == 0:
-        gvar.team_out[gvar.now_user % 2] += 1
+    if len(gvar.users_cards[gvar.now_player]) == 0:
+        gvar.team_out[gvar.now_player % 2] += 1
         if gvar.head_master == -1:
-            gvar.head_master = gvar.now_user
+            gvar.head_master = gvar.now_player
             for i in range(6):
                 if i % 2 == gvar.head_master % 2:
                     gvar.team_score[i % 2] += gvar.users_score[i]
         # 若队伍有头科，就不需要累加，没有则累加
-        elif gvar.head_master % 2 != gvar.now_user % 2:
-            gvar.team_score[gvar.now_user % 2] += gvar.users_score[gvar.now_user]
+        elif gvar.head_master % 2 != gvar.now_player % 2:
+            gvar.team_score[gvar.now_player % 2] += gvar.users_score[gvar.now_player]
 
         gvar.game_over = if_game_over()
     
@@ -167,17 +167,16 @@ class Game_Handler(BaseRequestHandler):
         data = json.loads(data.decode())
         return data
 
-    # 将username, tag发送给客户端
-    def send_user_info(self, tag, is_player):
+    def send_user_info(self, client_player, is_player):
         # 玩家/旁观者
         self.send_data(is_player)
         # 用户名
         users_name = [user_name for user_name, _ in gvar.users_name]
         self.send_data(users_name)
         # 用户标识号
-        self.send_data(tag)
+        self.send_data(client_player)
     
-    def send_cards_info(self, tag):
+    def send_cards_info(self, client_player):
         # 游戏结束
         self.send_data(gvar.game_over)
         # 用户得分
@@ -187,11 +186,11 @@ class Game_Handler(BaseRequestHandler):
         # 场上手牌
         self.send_data(gvar.played_cards)
         # 当前用户手牌
-        self.send_data(gvar.users_cards[tag])
+        self.send_data(gvar.users_cards[client_player])
         # 场上得分
         self.send_data(gvar.now_score)
         # 当前玩家
-        self.send_data(gvar.now_user)
+        self.send_data(gvar.now_player)
         # 头科
         self.send_data(gvar.head_master)
     # 接受用户输入
@@ -201,12 +200,12 @@ class Game_Handler(BaseRequestHandler):
         now_score = self.recv_data()
         return user_cards, played_cards, now_score
     # 旁观者运行函数
-    def bystander_handle(self, tag):
+    def bystander_handle(self, client_player):
         with gvar.bystander_lock:
             gvar.bystander_number += 1
         while True:
             gvar.bystander_start_sending_card_event.wait()
-            self.send_cards_info(tag)
+            self.send_cards_info(client_player)
             gvar.bystander_finish_sending_num += 1
             gvar.bystander_finish_sending_card_event.wait()
     # 让旁观者发送手牌
@@ -225,10 +224,10 @@ class Game_Handler(BaseRequestHandler):
             # 让旁观者线程进入到下一个循环
             gvar.bystander_finish_sending_card_event.set()
     # 玩家运行函数
-    def player_handle(self, tag):
+    def player_handle(self, client_player):
         while True:
             # 打牌前的处理
-            if tag == 0:
+            if client_player == 0:
                 before_playing()
                 gvar.before_playing_barrier.wait()
                 gvar.before_playing_barrier.reset()
@@ -236,18 +235,18 @@ class Game_Handler(BaseRequestHandler):
                 gvar.before_playing_barrier.wait()
                 
             # 将手牌等信息发送至各客户端
-            now_user = gvar.now_user
+            now_player = gvar.now_player
             # 让旁观者发送手牌
             active_t = threading.Thread(target=self.active_bystander)
-            if tag == 0:
+            if client_player == 0:
                 active_t.start()
             # 输出自己手牌
-            self.send_cards_info(tag)
+            self.send_cards_info(client_player)
             # 等待旁观者
-            if tag == 0:
+            if client_player == 0:
                 active_t.join()
             gvar.player_sending_card_barrier.wait()
-            if tag == 0:    
+            if client_player == 0:    
                 gvar.player_sending_card_barrier.reset()
             
             # 如果游戏结束了直接退，不含糊
@@ -256,17 +255,17 @@ class Game_Handler(BaseRequestHandler):
                 sys.exit(0)
             
             # 非此轮的线程阻塞等待
-            # 这里另起局部变量判断而不是用全局变量是因为now_user可能在tag用户的操作下发生变化
+            # 这里另起局部变量判断而不是用全局变量是因为now_player可能在client_player的操作下发生变化
             # 虽然感觉在gil下不会有问题……纯小题大做233……并发真不是正常人能玩的
-            if tag != now_user:
+            if client_player != now_player:
                 gvar.after_playing_barrier.wait()
             else:
                 # 接受出牌信息
-                print(f'Now Round:{gvar.users_name[tag]}')
-                assert(gvar.played_cards[tag] == [])
-                gvar.users_cards[tag], gvar.played_cards[tag], gvar.now_score \
+                print(f'Now Round:{gvar.users_name[client_player]}')
+                assert(gvar.played_cards[client_player] == [])
+                gvar.users_cards[client_player], gvar.played_cards[client_player], gvar.now_score \
                     = self.recv_player_reply()
-                print(f'Played Cards:{gvar.played_cards[tag]}')
+                print(f'Played Cards:{gvar.played_cards[client_player]}')
 
                 # 打牌后的处理
                 after_playing()
@@ -296,15 +295,15 @@ class Game_Handler(BaseRequestHandler):
             if user_idx == 5:
                 gvar.user_join_barrier.reset()
             # 找到该线程对应的玩家下标
-            tag = next((i for i, (_, user_pid) in enumerate(gvar.users_name) if pid == user_pid), 0)
+            client_player = next((i for i, (_, user_pid) in enumerate(gvar.users_name) if pid == user_pid), 0)
 
-            self.send_user_info(tag, is_player)
-            self.player_handle(tag)
+            self.send_user_info(client_player, is_player)
+            self.player_handle(client_player)
         else:
-            tag = random.randint(0, 5)
+            client_player = random.randint(0, 5)
 
-            self.send_user_info(tag, is_player)
-            self.bystander_handle(tag)
+            self.send_user_info(client_player, is_player)
+            self.bystander_handle(client_player)
 
 if __name__ == '__main__':
     server = ThreadingTCPServer(('0.0.0.0', 8080), Game_Handler)

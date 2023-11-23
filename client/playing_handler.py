@@ -181,14 +181,14 @@ def read_userinput(
     return now_played_cards, cursor
 
 # user: 用户信息
-# last_user: 最后打出牌的用户
-# client_user: 客户端正在输入的用户
+# last_player: 最后打出牌的玩家
+# client_player: 客户端正在输入的玩家
 # played_cards: 场上所有牌信息
-# client: 客户端socket，用于检测远端是否关闭了
+# client_socket: 客户端socket，用于检测远端是否关闭了
 def playing(
     user: UserInfo,
-    last_user: int,
-    client_user: int,
+    last_player: int,
+    client_player: int,
     played_cards,
     client_socket
 ) -> int:
@@ -216,8 +216,8 @@ def playing(
         user_input = [utils.str_to_int(c) for c in now_played_cards]
         _if_input_legal, score = if_input_legal(user_input,
                                                 [utils.str_to_int(c) for c in user.cards],
-                                                last_user == client_user,
-                                                [utils.str_to_int(c) for c in played_cards[last_user]])
+                                                [utils.str_to_int(c) for c in played_cards[last_player]]
+                                                    if last_player != client_player else None)
         if _if_input_legal:
             user.played_card = now_played_cards
             if now_played_cards[0] != 'F':

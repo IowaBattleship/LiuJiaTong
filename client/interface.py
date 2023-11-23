@@ -1,5 +1,9 @@
 import os
+from sound import playsound, playsounds
+from playingrules import judge_and_transform_cards, CardType
 from typing import List
+
+import utils
 
 def columns(string: str) -> int:
     columns = 0
@@ -202,7 +206,7 @@ def gen_player_paragraph(
     is_current_player: bool,
     is_head_master: bool,
     is_same_team: bool,
-    is_biggest_player: bool
+    is_last_player: bool
 ) -> Paragraph:
     paragraph = []
 
@@ -235,11 +239,11 @@ def gen_player_paragraph(
     player_score.string += f'{num_of_cards:>2}张{score:>3}分'
     paragraph.append(player_score)
 
-    player_played = Sentence()
-    if is_biggest_player:
-        player_played.underline = True
-    player_played.string += gen_cards_string(played_cards)
-    paragraph.append(player_played)
+    player_played_cards = Sentence()
+    if is_last_player:
+        player_played_cards.underline = True
+    player_played_cards.string += gen_cards_string(played_cards)
+    paragraph.append(player_played_cards)
 
     return paragraph
 
@@ -255,14 +259,16 @@ def gen_cards_chapter(cards) -> Chapter:
 
     return chapter
     
-def main_interface(users_name, client_player, users_score, users_cards_len,
-                   played_cards, user, now_score, now_user, head_master, biggest_player):
+def main_interface(
+    users_name, client_player, users_score, users_cards_len,
+    played_cards, user, now_score, now_player, head_master, last_player,
+    his_now_score, his_last_player, is_start
+):
     clear_screen()
     # 输出帮助
     help_chapter = gen_help_chapter()
     # 输出得分
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
-
     name_maxlen = 8
     for i in range(6):
         name_maxlen = max(name_maxlen, columns(users_name[i]))
@@ -277,10 +283,10 @@ def main_interface(users_name, client_player, users_score, users_cards_len,
             num_of_cards=users_cards_len[player],
             score=users_score[player],
             played_cards=played_cards[player],
-            is_current_player=(player == now_user),
+            is_current_player=(player == now_player),
             is_head_master=(player == head_master),
             is_same_team=(player % 2 == client_player % 2),
-            is_biggest_player=(player == biggest_player)
+            is_last_player=(player == last_player)
         )
         if player == client_player:
             client_player_chapter.append(player_paragraph)
@@ -319,10 +325,40 @@ def main_interface(users_name, client_player, users_score, users_cards_len,
             print_paragraph(paragraph, term_column)
     print_hline(term_column)
 
+    # 根据手牌判断播放的音效
+    if not is_start:
+        playsounds(["start", "open"], True)
+    elif last_player == now_player and his_now_score > 0:
+        playsound("fen", True, None)
+    elif last_player == his_last_player:
+        playsound("pass", True, None)
+    else:
+        last_played_cards = [utils.str_to_int(c) for c in played_cards[last_player]]
+        last_played_cards.sort(reverse=True)
+        (cardtype, _) = judge_and_transform_cards(last_played_cards)
+        assert cardtype != CardType.illegal_type, (last_player, last_played_cards)
+        bombs = [
+            CardType.black_joker_bomb,
+            CardType.red_joker_bomb,
+            CardType.normal_bomb
+        ]
+        if cardtype in bombs:
+            if len(last_played_cards) >= 7:
+                playsound("bomb3", True, None)
+            elif len(last_played_cards) >= 5:
+                playsound("bomb2", True, None)
+            else:
+                playsound("bomb1", True, None)
+        else:
+            if len(last_played_cards) >= 5:
+                playsound("throw2", True, None)
+            else:
+                playsound("throw1", True, None)
 
-def game_over_interface(tag, _if_game_over):
+
+def game_over_interface(client_player, _if_game_over):
     print('\n')
-    if tag % 2 + 1 == (_if_game_over + 2) % 2:
+    if client_player % 2 + 1 == (_if_game_over + 2) % 2:
         print('游戏结束，你的队伍获得了胜利', end='')
         if _if_game_over < 0:
             print('，并成功双统')
@@ -330,3 +366,4 @@ def game_over_interface(tag, _if_game_over):
         print('游戏结束，你的队伍未能取得胜利', end='')
         if _if_game_over < 0:
             print('，并被对方双统')
+    playsound("clap", False, None)

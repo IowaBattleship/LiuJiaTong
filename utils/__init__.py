@@ -47,10 +47,10 @@ def int_to_str(x=-1):
 
 
 # 返回上一位出牌玩家下标
-def last_played(played_cards, tag):
-    i = (tag - 1 + 6) % 6
-    while i != tag:
+def last_played(played_cards, player):
+    i = (player - 1 + 6) % 6
+    while i != player:
         if len(played_cards[i]) != 0:
             return i
         i = (i - 1 + 6) % 6
-    return tag
+    return player
