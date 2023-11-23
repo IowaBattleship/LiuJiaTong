@@ -7,23 +7,22 @@ import select
 import psutil
 from enum import Enum
 from playingrules import if_input_legal
-from userinfo import UserInfo
 
 def show_playingcards(
-    now_played_cards,
+    new_played_cards,
     cursor: int,
     err = ""
 ):
     # 恢复光标并清理所有的下面的屏幕数据
     print('\x1b[u\x1b[J',end='')
     # 打印信息
-    print("".join(now_played_cards))
+    print("".join(new_played_cards))
     if err != "":
         print(err)
     # 恢复光标
     print('\x1b[u', end='')
     # 再输出一遍直到cursor位置
-    print("".join(now_played_cards[0:cursor]), end='')
+    print("".join(new_played_cards[0:cursor]), end='')
     # 最后刷新print的缓冲区
     sys.stdout.flush()
     
@@ -123,12 +122,12 @@ elif os.name == 'nt':
             raise InputException('(非法输入)')
 
 def read_userinput(
-    now_played_cards,
+    new_played_cards,
     cursor: int,
-    user_cards
+    client_cards
 ):
     while True:
-        assert(cursor <= len(now_played_cards))
+        assert(cursor <= len(new_played_cards))
         end_input = False
         try:
             input = read_input()
@@ -136,62 +135,62 @@ def read_userinput(
                 if cursor > 0:
                     cursor -= 1
             elif input == SpecialInput.right_arrow:
-                if cursor < len(now_played_cards):
+                if cursor < len(new_played_cards):
                     cursor += 1
             elif input == SpecialInput.backspace:
                 if cursor > 0:
-                    now_played_cards = now_played_cards[:cursor - 1] + now_played_cards[cursor:]
+                    new_played_cards = new_played_cards[:cursor - 1] + new_played_cards[cursor:]
                     cursor -= 1
             elif input in ['\n', '\r']:
                 end_input = True
             elif input == '\t':
-                if now_played_cards == ['F']:
+                if new_played_cards == ['F']:
                     continue
                 if cursor > 0:
-                    fill_char = now_played_cards[cursor - 1]
-                    used_num = now_played_cards.count(fill_char)
-                    total_num = user_cards.count(fill_char)
+                    fill_char = new_played_cards[cursor - 1]
+                    used_num = new_played_cards.count(fill_char)
+                    total_num = client_cards.count(fill_char)
                     fill_num = total_num - used_num
                     assert (fill_num >= 0)
-                    now_played_cards = now_played_cards[:cursor] + fill_num * [fill_char] + now_played_cards[cursor:]
+                    new_played_cards = new_played_cards[:cursor] + fill_num * [fill_char] + new_played_cards[cursor:]
                     cursor += fill_num
             elif input == 'F':
-                now_played_cards = ['F']
+                new_played_cards = ['F']
                 cursor = 1
             elif input == 'C':
-                now_played_cards = []
+                new_played_cards = []
                 cursor = 0
             else:
-                assert(now_played_cards.count(input) <= user_cards.count(input))
-                if now_played_cards.count(input) == user_cards.count(input):
+                assert(new_played_cards.count(input) <= client_cards.count(input))
+                if new_played_cards.count(input) == client_cards.count(input):
                     raise InputException('(你打出的牌超过上限了)')
-                if now_played_cards == ['F']:
-                    now_played_cards = []
+                if new_played_cards == ['F']:
+                    new_played_cards = []
                     cursor = 0
-                now_played_cards = now_played_cards[:cursor] + [input] + now_played_cards[cursor:]
+                new_played_cards = new_played_cards[:cursor] + [input] + new_played_cards[cursor:]
                 cursor += 1
         except InputException as err:
-            show_playingcards(now_played_cards, cursor, err.args[0])
+            show_playingcards(new_played_cards, cursor, err.args[0])
         else:
-            show_playingcards(now_played_cards, cursor)
+            show_playingcards(new_played_cards, cursor)
         if end_input:
             break
-        assert(now_played_cards == ['F'] or now_played_cards.count('F') == 0)
+        assert(new_played_cards == ['F'] or new_played_cards.count('F') == 0)
     
-    return now_played_cards, cursor
+    return new_played_cards, cursor
 
-# user: 用户信息
+# client_cards: 用户所持卡牌信息
 # last_player: 最后打出牌的玩家
 # client_player: 客户端正在输入的玩家
-# played_cards: 场上所有牌信息
+# users_played_cards: 场上所有牌信息
 # client_socket: 客户端socket，用于检测远端是否关闭了
 def playing(
-    user: UserInfo,
+    client_cards,
     last_player: int,
     client_player: int,
-    played_cards,
+    users_played_cards,
     client_socket
-) -> int:
+):
     global g_client_socket
     g_client_socket = client_socket
     print('请输入要出的手牌(\'F\'表示跳过):')
@@ -199,7 +198,8 @@ def playing(
     print('\x1b[s',end='')
     show_playingcards([], 0)
 
-    now_played_cards = []
+    new_played_cards = []
+    new_score = 0
     cursor = 0
 
     if os.name == 'posix':
@@ -212,20 +212,17 @@ def playing(
         raise RuntimeError('unknow os!') 
 
     while True:
-        now_played_cards, cursor = read_userinput(now_played_cards, cursor, user.cards)
-        user_input = [utils.str_to_int(c) for c in now_played_cards]
-        _if_input_legal, score = if_input_legal(user_input,
-                                                [utils.str_to_int(c) for c in user.cards],
-                                                [utils.str_to_int(c) for c in played_cards[last_player]]
-                                                    if last_player != client_player else None)
+        new_played_cards, cursor = read_userinput(new_played_cards, cursor, client_cards)
+        user_input = [utils.str_to_int(c) for c in new_played_cards]
+        _if_input_legal, new_score = if_input_legal(
+            user_input,
+            [utils.str_to_int(c) for c in client_cards],
+            [utils.str_to_int(c) for c in users_played_cards[last_player]]
+                if last_player != client_player else None
+        )
         if _if_input_legal:
-            user.played_card = now_played_cards
-            if now_played_cards[0] != 'F':
-                for x in now_played_cards:
-                    user.cards.remove(x)
             break
-        else:
-            show_playingcards(now_played_cards, cursor, '(非法牌型)')
+        show_playingcards(new_played_cards, cursor, '(非法牌型)')
 
     if os.name == 'posix':
         #恢复核显
@@ -235,6 +232,6 @@ def playing(
     else:
         raise RuntimeError('unknow os!') 
     
-    return score
+    return new_played_cards, new_score
     
     

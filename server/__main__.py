@@ -16,8 +16,8 @@ class Game_Var:
     def init_game_env(self):
         self.users_cards = [[] for _ in range(6)]
         self.users_score = [0 for _ in range(6)]
-        self.user_finished = [False for _ in range(6)] # 玩家打完所有的牌
-        self.played_cards = [[] for _ in range(6)]  # 场上所出手牌
+        self.users_finished = [False for _ in range(6)] # 玩家打完所有的牌
+        self.users_played_cards = [[] for _ in range(6)]  # 场上所出手牌
         self.now_score = 0  # 场上分数
         self.now_player = 0  # 当前出牌玩家
         self.head_master = -1  # 头科玩家下标
@@ -25,6 +25,7 @@ class Game_Var:
         self.team_score = [0, 0]  # 各队分数
         self.team_out = [0, 0]  # 各队逃出人数
         self.game_over = 0 # 游戏结束状态
+    
     def __init__(self) -> None:
         # 用户登录
         self.users_name = []
@@ -37,11 +38,11 @@ class Game_Var:
         self.before_playing_barrier = threading.Barrier(6)
         self.after_playing_barrier = threading.Barrier(6)
         # 旁观者
-        self.bystander_lock = threading.Lock()
-        self.bystander_number = 0
-        self.bystander_finish_sending_num = 0
-        self.bystander_start_sending_card_event = threading.Event()
-        self.bystander_finish_sending_card_event = threading.Event()
+        self.onlooker_lock = threading.Lock()
+        self.onlooker_number = 0
+        self.onlooker_finish_sending_num = 0
+        self.onlooker_start_sending_card_event = threading.Event()
+        self.onlooker_finish_sending_card_event = threading.Event()
 
 gvar = Game_Var()
     
@@ -89,7 +90,7 @@ def start_game():
 # 下一位玩家出牌
 def set_next_player():
     gvar.now_player = (gvar.now_player + 1) % 6
-    while gvar.user_finished[gvar.now_player]:
+    while gvar.users_finished[gvar.now_player]:
         gvar.now_player = (gvar.now_player + 1) % 6
 
 def before_playing():
@@ -101,8 +102,8 @@ def before_playing():
     # 考虑到有多个人同时打完牌的情况，得用循环
     while len(gvar.users_cards[gvar.now_player]) == 0 \
             and gvar.last_player != gvar.now_player:
-        gvar.user_finished[gvar.now_player] = True
-        gvar.played_cards[gvar.now_player].clear()
+        gvar.users_finished[gvar.now_player] = True
+        gvar.users_played_cards[gvar.now_player].clear()
         set_next_player()
     
     # 一轮结束，统计此轮信息
@@ -121,18 +122,18 @@ def before_playing():
         gvar.now_score = 0
         # 如果刚好在此轮逃出，第一个出牌的人就要改变
         if len(gvar.users_cards[gvar.now_player]) == 0:
-            gvar.user_finished[gvar.now_player] = True
-            gvar.played_cards[gvar.now_player].clear()
+            gvar.users_finished[gvar.now_player] = True
+            gvar.users_played_cards[gvar.now_player].clear()
             set_next_player()
             gvar.last_player = gvar.now_player
 
     # 清除当前玩家的场上牌
-    gvar.played_cards[gvar.now_player].clear()
+    gvar.users_played_cards[gvar.now_player].clear()
 
 def after_playing():
     # skip
-    if gvar.played_cards[gvar.now_player][0] == 'F':
-        gvar.played_cards[gvar.now_player].clear()
+    if gvar.users_played_cards[gvar.now_player][0] == 'F':
+        gvar.users_played_cards[gvar.now_player].clear()
     else:
         gvar.last_player = gvar.now_player
     
@@ -184,7 +185,7 @@ class Game_Handler(BaseRequestHandler):
         # 用户手牌数
         self.send_data([len(x) for x in gvar.users_cards])
         # 场上手牌
-        self.send_data(gvar.played_cards)
+        self.send_data(gvar.users_played_cards)
         # 当前用户手牌
         self.send_data(gvar.users_cards[client_player])
         # 场上得分
@@ -200,29 +201,29 @@ class Game_Handler(BaseRequestHandler):
         now_score = self.recv_data()
         return user_cards, played_cards, now_score
     # 旁观者运行函数
-    def bystander_handle(self, client_player):
-        with gvar.bystander_lock:
-            gvar.bystander_number += 1
+    def onlooker_handle(self, client_player):
+        with gvar.onlooker_lock:
+            gvar.onlooker_number += 1
         while True:
-            gvar.bystander_start_sending_card_event.wait()
+            gvar.onlooker_start_sending_card_event.wait()
             self.send_cards_info(client_player)
-            gvar.bystander_finish_sending_num += 1
-            gvar.bystander_finish_sending_card_event.wait()
+            gvar.onlooker_finish_sending_num += 1
+            gvar.onlooker_finish_sending_card_event.wait()
     # 让旁观者发送手牌
-    def active_bystander(self):
-        with gvar.bystander_lock:
-            gvar.bystander_finish_sending_num = 0
+    def active_onlooker(self):
+        with gvar.onlooker_lock:
+            gvar.onlooker_finish_sending_num = 0
             # 阻塞出口
-            gvar.bystander_finish_sending_card_event.clear()
+            gvar.onlooker_finish_sending_card_event.clear()
             # 开始让旁观者发送信息
-            gvar.bystander_start_sending_card_event.set()
+            gvar.onlooker_start_sending_card_event.set()
             # 确保所有旁观者都发送完信息
-            while gvar.bystander_finish_sending_num < gvar.bystander_number:
+            while gvar.onlooker_finish_sending_num < gvar.onlooker_number:
                 time.sleep(0.1)
             # 阻塞入口
-            gvar.bystander_start_sending_card_event.clear()
+            gvar.onlooker_start_sending_card_event.clear()
             # 让旁观者线程进入到下一个循环
-            gvar.bystander_finish_sending_card_event.set()
+            gvar.onlooker_finish_sending_card_event.set()
     # 玩家运行函数
     def player_handle(self, client_player):
         while True:
@@ -237,7 +238,7 @@ class Game_Handler(BaseRequestHandler):
             # 将手牌等信息发送至各客户端
             now_player = gvar.now_player
             # 让旁观者发送手牌
-            active_t = threading.Thread(target=self.active_bystander)
+            active_t = threading.Thread(target=self.active_onlooker)
             if client_player == 0:
                 active_t.start()
             # 输出自己手牌
@@ -262,10 +263,10 @@ class Game_Handler(BaseRequestHandler):
             else:
                 # 接受出牌信息
                 print(f'Now Round:{gvar.users_name[client_player]}')
-                assert(gvar.played_cards[client_player] == [])
-                gvar.users_cards[client_player], gvar.played_cards[client_player], gvar.now_score \
+                assert(gvar.users_played_cards[client_player] == [])
+                gvar.users_cards[client_player], gvar.users_played_cards[client_player], gvar.now_score \
                     = self.recv_player_reply()
-                print(f'Played Cards:{gvar.played_cards[client_player]}')
+                print(f'Played Cards:{gvar.users_played_cards[client_player]}')
 
                 # 打牌后的处理
                 after_playing()
@@ -282,11 +283,11 @@ class Game_Handler(BaseRequestHandler):
             user_name = self.recv_data()
             if user_idx == 6:
                 is_player = False
-                print(f"{user_name} joined game. It is a bystander")
+                print(f"{user_name} joined game. It is a onlooker")
             else:
                 is_player = True
                 gvar.users_name.append((user_name, pid))
-                print(f"{user_name} joined game. It is a gamer")
+                print(f"{user_name} joined game. It is a player")
 
         if is_player:
             if user_idx == 5:  # 该线程作为发牌手
@@ -303,7 +304,7 @@ class Game_Handler(BaseRequestHandler):
             client_player = random.randint(0, 5)
 
             self.send_user_info(client_player, is_player)
-            self.bystander_handle(client_player)
+            self.onlooker_handle(client_player)
 
 if __name__ == '__main__':
     server = ThreadingTCPServer(('0.0.0.0', 8080), Game_Handler)

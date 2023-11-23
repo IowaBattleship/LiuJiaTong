@@ -247,22 +247,37 @@ def gen_player_paragraph(
 
     return paragraph
 
-def gen_cards_chapter(cards) -> Chapter:
+def gen_cards_chapter(is_player, client_cards) -> Chapter:
     chapter = []
 
     def gen_paragraph(string: str) -> Paragraph:
         sentence = Sentence()
         sentence.string = string
         return [sentence]
-    chapter.append(gen_paragraph("你的手牌:"))
-    chapter.append(gen_paragraph(gen_cards_string(cards)))
+    chapter.append(gen_paragraph("你的手牌" + ("(旁观)" if not is_player else "") + ":"))
+    chapter.append(gen_paragraph(gen_cards_string(client_cards)))
 
     return chapter
-    
+
 def main_interface(
-    users_name, client_player, users_score, users_cards_len,
-    played_cards, user, now_score, now_player, head_master, last_player,
-    his_now_score, his_last_player, is_start
+    # 客户端变量
+    is_start,
+    is_player,
+    client_cards,
+    client_player,
+    # 场面信息
+    users_name,
+    users_score,
+    users_cards_num,
+    users_played_cards,
+    head_master,
+    # 运行时数据
+    now_score,
+    now_player,
+    last_player,
+    # 历史数据
+    his_now_score, 
+    his_last_player,
 ):
     clear_screen()
     # 输出帮助
@@ -280,9 +295,9 @@ def main_interface(
         player_paragraph = gen_player_paragraph(
             name=users_name[player],
             name_maxlen=name_maxlen,
-            num_of_cards=users_cards_len[player],
+            num_of_cards=users_cards_num[player],
             score=users_score[player],
-            played_cards=played_cards[player],
+            played_cards=users_played_cards[player],
             is_current_player=(player == now_player),
             is_head_master=(player == head_master),
             is_same_team=(player % 2 == client_player % 2),
@@ -293,7 +308,7 @@ def main_interface(
         else:
             other_player_chapter.append(player_paragraph)
 
-    cards_chapter = gen_cards_chapter(user.cards)
+    cards_chapter = gen_cards_chapter(is_player, client_cards)
 
     """
     一共五部分，从上到下依次为
@@ -333,7 +348,7 @@ def main_interface(
     elif last_player == his_last_player:
         playsound("pass", True, None)
     else:
-        last_played_cards = [utils.str_to_int(c) for c in played_cards[last_player]]
+        last_played_cards = [utils.str_to_int(c) for c in users_played_cards[last_player]]
         last_played_cards.sort(reverse=True)
         (cardtype, _) = judge_and_transform_cards(last_played_cards)
         assert cardtype != CardType.illegal_type, (last_player, last_played_cards)
