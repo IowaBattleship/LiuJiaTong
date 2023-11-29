@@ -1,13 +1,16 @@
 import os
 import threading
+import platform
 
 def __playsound(paths: list[str], playtime):
     for path in paths:
         assert os.path.isabs(path), path
         cmd = ""
-        if os.name == "posix":
+        if platform.system() == "Darwin":
+            cmd = f"afplay {path} 2>/dev/null"
+        elif platform.system() == "Linux":
             cmd = f"aplay -q {path} 2>/dev/null"
-        elif os.name == "nt":
+        elif platform.system() == "Windows":
             cmd = f"powershell -c (New-Object Media.SoundPlayer '{path}').PlaySync()"
         else:
             raise RuntimeError('unknow os!') 
