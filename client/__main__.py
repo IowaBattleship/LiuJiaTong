@@ -11,21 +11,45 @@ from playing_handler import playing
 import utils
 import logger
 
-RECV_LEN = 1024
-HEADER_LEN = 4
-
 CONFIG_NAME = 'LiuJiaTong.json'
 
 class Config:
-    def __init__(self, ip, port, name):
+    def __init__(self, ip, port, name, cookie=None):
         self.ip = ip
         self.port = port
         self.name = name
+        self.cookie = cookie
+    
+    def __eq__(self, other):
+        if isinstance(other, Config) is False:
+            return False
+        return self.ip == other.ip and self.port == other.port and self.name == other.name
+
+    def __ne__(self, other) -> bool:
+        if isinstance(other, Config) is False:
+            return True
+        return self.ip != other.ip or self.port != other.port or self.name != other.name
+    
+    def dump(self):
+        with open(CONFIG_NAME, "w") as file:
+            data = {
+                "ip": self.ip,
+                "port": self.port,
+                "name": self.name,
+                "cookie": self.cookie,
+            }
+            json.dump(data, file)
+    
+    def update_cookie(self, cookie):
+        self.cookie = cookie
+        self.dump()
 
 class Client:
-    def __init__(self):
+    def __init__(self, no_cookie: bool):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+        self.config = None # 客户端配置文件
+        self.no_cookie = no_cookie # 禁用cookie恢复
         self.client_player = 0 # 客户端用户标识
         self.client_cards = []  # 持有牌
         self.is_player = False  # 玩家/旁观者
@@ -41,31 +65,31 @@ class Client:
         self.his_last_player = None # 历史上一个打牌的人，用于判断是否上次发生打牌事件
         self.is_start = False # 记录是否游戏还在开局
     
-    def take_log(self):
+    def take_log(self, last_player):
         logger.info(f"----------new round------------")
         logger.info(f"cilent_cards: {self.client_cards}")
         logger.info(f"users_score: {self.users_score}")
         logger.info(f"users_played_cards: {self.users_played_cards}")
-        logger.info(f"now_player: {self.users_name[self.now_player]}")
         logger.info(f"now_score: {self.now_score}")
+        logger.info(f"now_player: {self.users_name[self.now_player]}")
+        logger.info(f"last_player: {self.users_name[last_player]}")
         logger.info(f"head_master: {self.users_name[self.head_master] if self.head_master != -1 else None}")
         logger.info(f"his_now_score: {self.his_now_score}")
         logger.info(f"his_last_player: {self.his_last_player}")
 
-    def get_config(self):
+    def load_config(self):
         try:
             with open(CONFIG_NAME, "r") as file:
                 data = json.load(file)
-                self.config = Config(data["ip"], int(data["port"]), data["name"])
+                self.config = Config(data["ip"], int(data["port"]), data["name"], data["cookie"])
         except:
-            if hasattr(self, "config"):
-                del self.config
+            self.config = None
 
-        if hasattr(self, "config"):
+        if self.config is not None:
             print("已经检测到之前输入的配置，配置如下:")
         
         while True:
-            if hasattr(self, "config"):
+            if self.config is not None:
                 print(f"IP地址: {self.config.ip}")
                 print(f"端口:   {self.config.port}")
                 print(f"用户名: {self.config.name}")
@@ -75,12 +99,12 @@ class Client:
                     if resp in ['', 'Y']:
                         break
                     elif resp == 'N':
-                        del self.config
+                        self.config = None
                         break
                     else:
                         print(f"非法输入: ", end='')
             
-            if hasattr(self, "config"):
+            if self.config is not None:
                 break
             
             while True:
@@ -88,33 +112,33 @@ class Client:
                 port = input(f"请输入端口: ")
                 name = input(f"请输入用户名: ")
                 try:
-                    self.config = Config(ip, int(port), name)
+                    if self.config != Config(ip, int(port), name):
+                        self.config = Config(ip, int(port), name)
                 except:
                     print(f"输入有误，请重新输入")
                 else:
-                    with open(CONFIG_NAME, "w") as file:
-                        data = {
-                            "ip": self.config.ip,
-                            "port": self.config.port,
-                            "name": self.config.name
-                        }
-                        json.dump(data, file)
+                    self.config.dump()
                     print('')
                     break
 
-    def connect(self, server_ip='127.0.0.1', server_port=8080):
+    def connect(self, server_ip, server_port):
         if_connected = False
-
-        while if_connected is False:
-            print("Try to connect with server...")
-            if_connected = True
+        try_times = 0
+        while if_connected is False and try_times < 10:
             try:
+                print("Try to connect with server...")
+                try_times += 1
                 self.client.connect((server_ip, server_port))
             except Exception as e:
                 print(e)
-                if_connected = False
                 time.sleep(1)
-        print("Successfully connected")
+            else:
+                if_connected = True
+        if if_connected:
+            print("Connect succeeded")
+        else:
+            print("Connect failed")
+        return if_connected
 
     def close(self):
         self.client.close()
@@ -126,33 +150,42 @@ class Client:
         self.client.sendall(data)
     
     def recv_data(self):
+        HEADER_LEN = 4
         header = self.client.recv(HEADER_LEN)
         header = struct.unpack('i', header)[0]
         data = self.client.recv(header)
         data = json.loads(data.decode())
         return data
-    
-    # 接收场上信息
-    def recv_card_info(self):
-        self.game_over = self.recv_data()
-        self.users_score = self.recv_data()
-        self.users_cards_num = self.recv_data()
-        self.users_played_cards = self.recv_data()
-        self.client_cards = self.recv_data()
-        self.now_score = self.recv_data()
-        self.now_player = self.recv_data()
-        self.head_master = self.recv_data()
-    
-    # 向server发送打出牌或skip的信息
-    def send_card_info(self):
-        self.send_data(self.client_cards)
-        self.send_data(self.users_played_cards[self.client_player])
-        self.send_data(self.now_score)
 
-    def run(self):
-        self.send_data(client.config.name)
-
-        # 接收用户信息
+    def send_user_info(self) -> bool:
+        # 发送本地的cookie信息
+        logger.info(f"Client coockie {self.config.cookie}")
+        if self.no_cookie:
+            logger.info("Disable cookie")
+            self.send_data(False)
+        elif self.config.cookie is not None and isinstance(self.config.cookie, str):
+            self.send_data(True)
+            self.send_data(self.config.cookie)
+        else:
+            self.send_data(False)
+        # 服务端判断cookie是否合法，如果不合法重发cookie
+        # 重发cookie的同时还得同步用户名
+        if_valid_cookie = self.recv_data()
+        if if_valid_cookie:
+            print("Start recovery")
+            if_recovery = self.recv_data()
+            if if_recovery is False:
+                print("Recovery failed, may someone are running this yet?")
+                return False
+        else:
+            print("Start game")
+            self.send_data(self.config.name)
+            self.config.update_cookie(self.recv_data())
+            logger.info(f"cookie invalid, new cookie {self.config.cookie}")
+        return True
+    
+    # 接收用户信息
+    def recv_field_info(self):
         self.is_player = self.recv_data()
         self.users_name = self.recv_data()
         self.client_player = self.recv_data()
@@ -161,8 +194,29 @@ class Client:
         logger.info(f"users_name: {self.users_name}")
         logger.info(f"client_player: {self.client_player}")
 
+    # 接收场上信息
+    def recv_round_info(self):
+        self.game_over = self.recv_data()
+        self.users_score = self.recv_data()
+        self.users_cards_num = self.recv_data()
+        self.users_played_cards = self.recv_data()
+        self.client_cards = self.recv_data()
+        self.now_score = self.recv_data()
+        self.now_player = self.recv_data()
+        self.head_master = self.recv_data()
+
+    # 向server发送打出牌或skip的信息
+    def send_player_info(self):
+        self.send_data(self.client_cards)
+        self.send_data(self.users_played_cards[self.client_player])
+        self.send_data(self.now_score)
+
+    def run(self):
+        if self.send_user_info() is False:
+            return
+        self.recv_field_info()
         while True:
-            self.recv_card_info()
+            self.recv_round_info()
             # UI
             last_player = utils.last_played(self.users_played_cards, self.now_player)
             # 这里需要额外考虑一个情况就是当一个人打完所有牌，所有玩家无法跟时
@@ -182,7 +236,7 @@ class Client:
                 # 历史数据
                 self.his_now_score, self.his_last_player 
             )
-            self.take_log()
+            self.take_log(last_player)
             # 记录历史信息
             self.his_now_score = self.now_score
             self.his_last_player = last_player if last_player != self.now_player else None
@@ -197,21 +251,25 @@ class Client:
                                 self.client_player, self.users_played_cards, self.client)
                 new_played_cards.sort(key = utils.str_to_int)
                 self.users_played_cards[self.client_player] = new_played_cards
+                if new_played_cards != ['F']:
+                    for card in new_played_cards:
+                        self.client_cards.remove(card)
                 self.now_score += new_score
-                self.send_card_info()
+                self.send_player_info()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统客户端')
     parser.add_argument('--ip', type=str, help='ip address')
     parser.add_argument('--port', type=int, help='port')
     parser.add_argument('--user-name', type=str, help='user name')
+    parser.add_argument('-n', '--no-cookie', action='store_true', default=False, help='disable cookies')
     args = parser.parse_args()
 
     logger.init_logger()
 
-    client = Client()
+    client = Client(args.no_cookie)
     if args.ip == None or args.port == None or args.user_name == None:
-        client.get_config()
+        client.load_config()
     else:
         client.config = Config(args.ip, args.port, args.user_name)
 
