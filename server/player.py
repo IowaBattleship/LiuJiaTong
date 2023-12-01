@@ -56,7 +56,9 @@ class Player(GameStateMachine):
         with gvar.users_info_lock:
             self.tcp_handler.client_player = self.client_player = \
                 next((i for i, (_, user_pid) in enumerate(gvar.users_info) if self.pid == user_pid), 0)
+            user_name, _ = gvar.users_info[self.client_player]
             gvar.users_cookie[self.tcp_handler.user_cookie] = self.client_player
+        logger.info(f"{user_name}({self.pid}) -> client_player: {self.client_player}")
     def send_round_info_sync(self): 
         gvar.send_round_info_barrier.wait()
     def recv_player_info_sync(self): 

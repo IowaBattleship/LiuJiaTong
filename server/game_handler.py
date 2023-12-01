@@ -5,6 +5,7 @@ import secrets
 import string
 import time
 import random
+import logger
 from player import Player
 from onlooker import Onlooker
 from game_vars import gvar
@@ -99,6 +100,7 @@ class Game_Handler(BaseRequestHandler):
                     self.user_cookie = self.generate_cookie()
                     self.send_data(self.user_cookie)
                     print(f"{user_name} joined game. It is a player. cookie: {self.user_cookie}")
+                    logger.info(f"{user_name}({self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
                     gvar.users_info.append((user_name, self.pid))
