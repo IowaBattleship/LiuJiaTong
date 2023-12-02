@@ -6,6 +6,7 @@ import time
 import select
 import psutil
 import logger
+import platform
 from enum import Enum
 from playingrules import if_input_legal
 
@@ -40,6 +41,29 @@ class InputException(Exception):
 
 g_client_socket = socket.socket()
 
+if platform.system() == "Darwin":
+    def check_tcp_connection():
+        try:
+            raddr = g_client_socket.getpeername()
+            for conn in psutil.net_connections('tcp'):
+                if conn.raddr == raddr:
+                    return conn.status == 'ESTABLISHED'
+            return False
+        except psutil.AccessDenied:
+            return True
+elif platform.system() == "Linux":
+    def check_tcp_connection():
+        return g_client_socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO) == 1
+elif platform.system() == "Windows":
+    def check_tcp_connection():
+        raddr = g_client_socket.getpeername()
+        for conn in psutil.net_connections('tcp'):
+            if conn.raddr == raddr:
+                return conn.status == 'ESTABLISHED'
+        return False
+else:
+    raise RuntimeError("unknown os")
+
 # io系列函数
 # now_played_cards: 用户已经输入好的字符串
 # cursor: 光标位置
@@ -48,9 +72,14 @@ g_client_socket = socket.socket()
 if os.name == 'posix':
     # linux & mac
     def read_byte() -> str:
+        TCP_COUNTER = 20
+        check_tcp_counter = 0
         while select.select([sys.stdin], [], [], 0) == ([], [], []):
-            if g_client_socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO) != 1:
-                raise RuntimeError()
+            if check_tcp_counter == 0:
+                if check_tcp_connection() is False:
+                    raise RuntimeError("Connection Failed")
+                check_tcp_counter = TCP_COUNTER
+            check_tcp_counter -= 1
             time.sleep(0.05)
         return sys.stdin.read(1)
 
@@ -84,20 +113,16 @@ elif os.name == 'nt':
     # windows
     from msvcrt import getch, kbhit
     def read_byte() -> str:
+        TCP_COUNTER = 20
+        check_tcp_counter = 0
         while not kbhit():
-            def check_tcp():
-                raddr = g_client_socket.getpeername()
-                connections = psutil.net_connections('tcp')
-                for conn in connections:
-                    if conn.raddr == raddr:
-                        if conn.status == 'ESTABLISHED':
-                            return True
-                return False
-            if not check_tcp():
-                raise RuntimeError()
+            if check_tcp_counter == 0:
+                if check_tcp_connection() is False:
+                    raise RuntimeError("Connection Failed")
+                check_tcp_counter = TCP_COUNTER
+            check_tcp_counter -= 1
             time.sleep(0.05)
-        char = chr(getch()[0])
-        return char
+        return chr(getch()[0])
         
     def read_direction():
         dir = read_byte()
