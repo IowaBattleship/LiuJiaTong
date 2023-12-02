@@ -68,15 +68,16 @@ class Client:
         self.config = None # 客户端配置文件
         self.no_cookie = no_cookie # 禁用cookie恢复
         self.client_player = 0 # 客户端用户标识
-        self.client_cards = []  # 持有牌
+        self.client_cards = [] # 持有牌
+        self.users_cards = [[] for _ in range(6)] # 所有用户的牌，用于最后游戏结束时展现寻找战犯
         self.is_player = False  # 玩家/旁观者
-        self.users_name = [] # 用户名字
+        self.users_name = ["" for _ in range(6)] # 用户名字
         self.game_over = 0 # 游戏结束标志，非0代表已经结束
         self.now_score = 0 # 场上的分数
         self.now_player = 0 # 当前的玩家
-        self.users_cards_num = [] # 用户牌数
-        self.users_score = [] # 用户分数
-        self.users_played_cards = [] # 场上的牌
+        self.users_cards_num = [0 for _ in range(6)] # 用户牌数
+        self.users_score = [0 for _ in range(6)] # 用户分数
+        self.users_played_cards = [[] for _ in range(6)] # 场上的牌
         self.head_master = 0 # 头科
         self.his_now_score = 0 # 历史场上分数，用于判断是否发生了得分
         self.his_last_player = None # 历史上一个打牌的人，用于判断是否上次发生打牌事件
@@ -217,6 +218,8 @@ class Client:
         self.users_score = self.recv_data()
         self.users_cards_num = self.recv_data()
         self.users_played_cards = self.recv_data()
+        if self.game_over != 0:
+            self.users_cards = self.recv_data()
         self.client_cards = self.recv_data()
         self.now_score = self.recv_data()
         self.now_player = self.recv_data()
@@ -247,7 +250,7 @@ class Client:
                 self.is_start, self.is_player, self.client_cards, self.client_player,
                 # 场面信息
                 self.users_name, self.users_score, self.users_cards_num, 
-                self.users_played_cards, self.head_master,
+                self.users_cards, self.users_played_cards, self.head_master,
                 # 运行时数据
                 self.now_score, self.now_player, last_player,
                 # 历史数据

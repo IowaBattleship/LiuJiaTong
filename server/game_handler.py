@@ -53,6 +53,8 @@ class Game_Handler(BaseRequestHandler):
         # 用户手牌数
         self.send_data([len(x) for x in gvar.users_cards])
         self.send_data(gvar.users_played_cards)
+        if gvar.game_over != 0:
+            self.send_data(gvar.users_cards)
         # 当前用户手牌
         self.send_data(gvar.users_cards[self.client_player])
         self.send_data(gvar.now_score)
@@ -78,7 +80,7 @@ class Game_Handler(BaseRequestHandler):
             if_has_cookie = self.recv_data()
             if if_has_cookie:
                 self.user_cookie = self.recv_data()
-                self.client_player = gvar.users_cookie[self.user_cookie]
+                self.client_player = gvar.users_cookie.get(self.user_cookie)
             else:
                 self.client_player = None
             # cookie是否合法

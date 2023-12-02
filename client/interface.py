@@ -197,7 +197,7 @@ def gen_cards_string(cards):
         string += cards[i]
     return string
 
-def gen_player_paragraph(
+def gen_player_field_paragraph(
     name: str,
     name_maxlen: int,
     num_of_cards: int,
@@ -247,6 +247,15 @@ def gen_player_paragraph(
 
     return paragraph
 
+def gen_player_cards_paragraph(user_cards) -> Paragraph:
+    paragraph = []
+
+    player_cards = Sentence()
+    player_cards.string += gen_cards_string(user_cards)
+    paragraph.append(player_cards)
+
+    return paragraph
+
 def gen_cards_chapter(is_player, client_cards) -> Chapter:
     chapter = []
 
@@ -269,6 +278,7 @@ def main_interface(
     users_name,
     users_score,
     users_cards_num,
+    users_cards,
     users_played_cards,
     head_master,
     # 运行时数据
@@ -292,7 +302,7 @@ def main_interface(
     client_player_chapter = []
     for i in range(0, 6):
         player = (client_player + i + 1) % 6
-        player_paragraph = gen_player_paragraph(
+        player_field_paragraph = gen_player_field_paragraph(
             name=users_name[player],
             name_maxlen=name_maxlen,
             num_of_cards=users_cards_num[player],
@@ -304,9 +314,15 @@ def main_interface(
             is_last_player=(player == last_player)
         )
         if player == client_player:
-            client_player_chapter.append(player_paragraph)
+            client_player_chapter.append(player_field_paragraph)
         else:
-            other_player_chapter.append(player_paragraph)
+            other_player_chapter.append(player_field_paragraph)
+
+        if users_cards[player] == []:
+            continue
+        player_cards_paragraph = gen_player_cards_paragraph(users_cards[player])
+        if player != client_player:
+            other_player_chapter.append(player_cards_paragraph)
 
     cards_chapter = gen_cards_chapter(is_player, client_cards)
 
