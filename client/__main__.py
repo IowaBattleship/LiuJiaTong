@@ -1,16 +1,23 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-try:
-    import psutil
-except ImportError:
-    os.system("pip3 install psutil")
-if os.name == 'nt':
+
+import importlib
+if_need_restart = False
+def check_package(package, install=None):
     try:
-        import win32api
-        import win32con
+        importlib.import_module(package)
     except ImportError:
-        os.system("pip3 install pypiwin32")
+        os.system(f"pip3 install {package if install is None else install}")
+        global if_need_restart; if_need_restart = True
+check_package("psutil")
+if os.name == 'nt':
+    check_package("win32api", "pypiwin32")
+    check_package("win32con", "pypiwin32")
+if if_need_restart:
+    print("\x1b[32m\x1b[1mPackages are installed, please restart program to update system enviroment\x1b[0m")
+    os._exit(0)
+
 import json
 import socket
 import struct
