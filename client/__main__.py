@@ -1,6 +1,16 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    import psutil
+except ImportError:
+    os.system("pip3 install psutil")
+if os.name == 'nt':
+    try:
+        import win32api
+        import win32con
+    except ImportError:
+        os.system("pip3 install pypiwin32")
 import json
 import socket
 import struct
