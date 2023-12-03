@@ -5,14 +5,6 @@ from typing import List
 
 import utils
 
-def columns(string: str) -> int:
-    columns = 0
-    for ch in string:
-        if '\u4e00' <= ch <= '\u9fff':
-            columns += 2 #中文字符占两格
-        else:
-            columns += 1
-    return columns
 class Sentence:
     """
     打印的切片数据
@@ -33,7 +25,7 @@ class Sentence:
         return self.string
     
     def columns(self) -> int:
-        return columns(self.string)
+        return utils.columns(self.string)
     
     def gen_print(self) -> str:
         print_str = ""
@@ -71,7 +63,7 @@ def clear_screen():
     print('\x1b[2J\x1b[H', end='')
 
 def print_hline(term_column: int):
-    assert(term_column >= 2)
+    assert term_column >= 2, term_column
     print('+', '-' * (term_column - 2), '+', sep='')
 
 def paragraph_columns(paragraph: Paragraph) -> int:
@@ -120,13 +112,13 @@ def print_paragraph(paragraph: Paragraph, term_column: int):
                             if 'A' <= ch <= 'Z' or 'a' <= ch <= 'z': #这里简单判了，不是很标准
                                 csi_flag = False
                             continue
-                        if now_column + columns(ch) > max_column:
+                        if now_column + utils.columns(ch) > max_column:
                             print(' ' * (max_column - now_column), '\x1b[0m', '|', sep='')
                             print('|', sentence.gen_csi(), ch, sep='', end='')
-                            now_column = columns(ch)
+                            now_column = utils.columns(ch)
                         else:
                             print(ch, end='')
-                            now_column += columns(ch)
+                            now_column += utils.columns(ch)
                     printed = True
             else:
                 print(sentence.gen_print(), end='')
@@ -296,7 +288,7 @@ def main_interface(
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
     name_maxlen = 8
     for i in range(6):
-        name_maxlen = max(name_maxlen, columns(users_name[i]))
+        name_maxlen = max(name_maxlen, utils.columns(users_name[i]))
     # 输出其它玩家
     other_player_chapter = []
     client_player_chapter = []

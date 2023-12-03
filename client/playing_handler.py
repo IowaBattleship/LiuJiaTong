@@ -8,25 +8,71 @@ import psutil
 import logger
 import platform
 from enum import Enum
+import utils
 from playingrules import if_input_legal
 
-def show_playingcards(
-    new_played_cards,
-    cursor: int,
-    err = ""
-):
-    # 恢复光标并清理所有的下面的屏幕数据
-    print('\x1b[u\x1b[J',end='')
-    # 打印信息
-    print("".join(new_played_cards))
-    if err != "":
-        print(err)
-    # 恢复光标
-    print('\x1b[u', end='')
-    # 再输出一遍直到cursor位置
-    print("".join(new_played_cards[0:cursor]), end='')
-    # 最后刷新print的缓冲区
-    sys.stdout.flush()
+class TerminalHandler:
+    def __init__(self):
+        # 终端信息
+        self.column_max = os.get_terminal_size().columns - 1
+        assert self.column_max >= 2, self.column_max
+        self.row = self.column = 0
+        self.row_buffer = ""
+        # 用户打牌信息
+        self.new_played_cards = []
+        self.cursor = 0
+        self.err = ""
+    
+    def __reset_cursor(self):
+        if self.row > 0:
+            print(f"\x1b[{self.row}A", end='')
+            self.row = 0
+        if self.column > 0:
+            print(f"\x1b[{self.column}D", end='')
+            self.column = 0
+
+    def __flush_buffer(self, end):
+        assert end in ['\n', ''], end
+        print(self.row_buffer, end=end)
+        if end == '\n':
+            self.row += 1
+            self.column = 0
+        self.row_buffer = ""
+
+    def __print_string(self, string:str, end='\n'):
+        assert self.row_buffer == "", self.row_buffer
+        assert end in ['\n', ''], end
+        for ch in string:
+            ch_columns = utils.columns(ch)
+            if self.column + ch_columns > self.column_max:
+                self.__flush_buffer(end='\n')
+            self.row_buffer += ch
+            self.column += ch_columns
+        if end == '\n':
+            if self.row_buffer != "":
+                self.__flush_buffer(end='\n')
+        elif end == '':
+            if self.column == self.column_max:
+                self.__flush_buffer(end='\n')
+            else:
+                self.__flush_buffer(end='')
+        else:
+            raise RuntimeError("")
+
+    def print(self):
+        # 恢复光标并清理所有的下面的屏幕数据
+        self.__reset_cursor()
+        print("\x1b[J", end='')
+        sys.stdout.flush()
+        # 打印信息
+        self.__print_string("".join(self.new_played_cards))
+        self.__print_string(self.err, end='')
+        # 恢复光标
+        self.__reset_cursor()
+        # 再输出一遍直到cursor位置
+        self.__print_string("".join(self.new_played_cards[0:self.cursor]), end='')
+        # 最后刷新print的缓冲区
+        sys.stdout.flush()
     
 class SpecialInput(Enum):
     left_arrow = 0
@@ -39,6 +85,7 @@ class InputException(Exception):
     def __str__(self):
         return repr(self.value)
 
+g_terminal_handler = TerminalHandler()
 g_client_socket = socket.socket()
 
 if platform.system() == "Darwin":
@@ -71,7 +118,9 @@ else:
 # 输出新的now_played_cards, cursor二元组
 if os.name == 'posix':
     # linux & mac
-    def read_byte() -> str:
+    def read_byte(if_remaining: bool) -> str:
+        if if_remaining:
+            return sys.stdin.read(1)
         TCP_COUNTER = 20
         check_tcp_counter = 0
         while select.select([sys.stdin], [], [], 0) == ([], [], []):
@@ -84,10 +133,10 @@ if os.name == 'posix':
         return sys.stdin.read(1)
 
     def read_direction():
-        if read_byte() != '[':
+        if read_byte(True) != '[':
             raise InputException('(非法输入)')
         else:
-            dir = read_byte()
+            dir = read_byte(True)
             if dir == 'D':
                 return SpecialInput.left_arrow
             elif dir == 'C':
@@ -96,7 +145,7 @@ if os.name == 'posix':
                 raise InputException('(非法输入)')
     
     def read_input():
-        fst_byte = read_byte().upper()
+        fst_byte = read_byte(False).upper()
         if fst_byte == '\x1b':
             # 判断是否是左右方向键
             return read_direction()
@@ -147,63 +196,61 @@ elif os.name == 'nt':
         else:
             raise InputException('(非法输入)')
 
-def read_userinput(
-    new_played_cards,
-    cursor: int,
-    client_cards
-):
+def read_userinput(client_cards):
+    th = g_terminal_handler
     while True:
-        assert(cursor <= len(new_played_cards))
+        assert(th.cursor <= len(th.new_played_cards))
         end_input = False
         try:
             input = read_input()
             if input == SpecialInput.left_arrow:
-                if cursor > 0:
-                    cursor -= 1
+                if th.cursor > 0:
+                    th.cursor -= 1
             elif input == SpecialInput.right_arrow:
-                if cursor < len(new_played_cards):
-                    cursor += 1
+                if th.cursor < len(th.new_played_cards):
+                    th.cursor += 1
             elif input == SpecialInput.backspace:
-                if cursor > 0:
-                    new_played_cards = new_played_cards[:cursor - 1] + new_played_cards[cursor:]
-                    cursor -= 1
+                if th.cursor > 0:
+                    th.new_played_cards = th.new_played_cards[:th.cursor - 1] + th.new_played_cards[th.cursor:]
+                    th.cursor -= 1
             elif input in ['\n', '\r']:
                 end_input = True
             elif input == '\t':
-                if new_played_cards == ['F']:
+                if th.new_played_cards == ['F']:
                     continue
-                if cursor > 0:
-                    fill_char = new_played_cards[cursor - 1]
-                    used_num = new_played_cards.count(fill_char)
+                if th.cursor > 0:
+                    fill_char = th.new_played_cards[th.cursor - 1]
+                    used_num = th.new_played_cards.count(fill_char)
                     total_num = client_cards.count(fill_char)
                     fill_num = total_num - used_num
                     assert (fill_num >= 0)
-                    new_played_cards = new_played_cards[:cursor] + fill_num * [fill_char] + new_played_cards[cursor:]
-                    cursor += fill_num
+                    th.new_played_cards = th.new_played_cards[:th.cursor] + fill_num * [fill_char] + th.new_played_cards[th.cursor:]
+                    th.cursor += fill_num
             elif input == 'F':
-                new_played_cards = ['F']
-                cursor = 1
+                th.new_played_cards = ['F']
+                th.cursor = 1
             elif input == 'C':
-                new_played_cards = []
-                cursor = 0
+                th.new_played_cards = []
+                th.cursor = 0
             else:
-                assert(new_played_cards.count(input) <= client_cards.count(input))
-                if new_played_cards.count(input) == client_cards.count(input):
+                assert(th.new_played_cards.count(input) <= client_cards.count(input))
+                if th.new_played_cards.count(input) == client_cards.count(input):
                     raise InputException('(你打出的牌超过上限了)')
-                if new_played_cards == ['F']:
-                    new_played_cards = []
-                    cursor = 0
-                new_played_cards = new_played_cards[:cursor] + [input] + new_played_cards[cursor:]
-                cursor += 1
+                if th.new_played_cards == ['F']:
+                    th.new_played_cards = []
+                    th.cursor = 0
+                th.new_played_cards = th.new_played_cards[:th.cursor] + [input] + th.new_played_cards[th.cursor:]
+                th.cursor += 1
         except InputException as err:
-            show_playingcards(new_played_cards, cursor, err.args[0])
+            th.err = err.args[0]
         else:
-            show_playingcards(new_played_cards, cursor)
+            th.err = ""
+        finally:
+            th.print()
         if end_input:
             break
-        assert(new_played_cards == ['F'] or new_played_cards.count('F') == 0)
-    
-    return new_played_cards, cursor
+        assert(th.new_played_cards == ['F'] or th.new_played_cards.count('F') == 0)
+    return th.new_played_cards
 
 # client_cards: 用户所持卡牌信息
 # last_player: 最后打出牌的玩家
@@ -220,13 +267,11 @@ def playing(
     global g_client_socket
     g_client_socket = client_socket
     print('请输入要出的手牌(\'F\'表示跳过):')
-    # 保存当前光标位置
-    print('\x1b[s',end='')
-    show_playingcards([], 0)
+    global g_terminal_handler
+    g_terminal_handler = TerminalHandler()
 
     new_played_cards = []
     new_score = 0
-    cursor = 0
 
     if os.name == 'posix':
         #关闭核显，这里偷个懒假设大家都有stty程序
@@ -239,7 +284,7 @@ def playing(
 
     logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
     while True:
-        new_played_cards, cursor = read_userinput(new_played_cards, cursor, client_cards)
+        new_played_cards = read_userinput(client_cards)
         _if_input_legal, new_score = if_input_legal(
             [utils.str_to_int(c) for c in new_played_cards],
             [utils.str_to_int(c) for c in client_cards],
@@ -249,7 +294,8 @@ def playing(
         if _if_input_legal:
             logger.info(f"now play: {new_played_cards}")
             break
-        show_playingcards(new_played_cards, cursor, '(非法牌型)')
+        g_terminal_handler.err = '(非法牌型)'
+        g_terminal_handler.print()
 
     if os.name == 'posix':
         #恢复核显

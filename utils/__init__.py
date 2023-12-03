@@ -54,3 +54,12 @@ def last_played(played_cards, player):
             return i
         i = (i - 1 + 6) % 6
     return player
+
+def columns(string: str) -> int:
+    columns = 0
+    for ch in string:
+        if '\u4e00' <= ch <= '\u9fff':
+            columns += 2 #中文字符占两格
+        else:
+            columns += 1
+    return columns
