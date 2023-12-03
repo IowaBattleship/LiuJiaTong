@@ -44,7 +44,8 @@ class Onlooker(GameStateMachine):
     def onlooker_sync(self): 
         gvar.onlooker_event.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
-        self.__game_over = gvar.game_over
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
     def game_start_sync(self): 
         raise RuntimeError("unsupport state")
     def send_round_info_sync(self): 
@@ -98,7 +99,8 @@ class Onlooker(GameStateMachine):
         _, self.pid = tcp_handler.client_address
         
         self.error = False
-        self.__game_over = 0
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
     
     def send_data(self, data):
         self.tcp_handler.send_data(data)

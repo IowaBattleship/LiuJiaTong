@@ -6,8 +6,6 @@ class Game_Var:
         self.users_score = [0 for _ in range(6)]
         self.users_finished = [False for _ in range(6)] # 玩家打完所有的牌
         self.users_played_cards = [[] for _ in range(6)]  # 场上所出手牌
-        self.users_his_state = [GameState.init for _ in range(6)] # 用户记录的历史状态
-        self.users_error = [False for _ in range(6)] # 用户是否发生异常
 
         self.now_score = 0  # 场上分数
         self.now_player = 0  # 当前出牌玩家
@@ -19,9 +17,12 @@ class Game_Var:
     
     def init_global_env(self):
         with self.users_info_lock:
+            assert self.onlooker_lock.locked()
             self.serving_game_round += 1
             self.users_info = []
             self.users_cookie = {}
+            self.users_his_state = [GameState.init for _ in range(6)]
+            self.users_error = [False for _ in range(6)]
     
     def __init__(self) -> None:
         # 用户登录
@@ -29,7 +30,10 @@ class Game_Var:
         self.serving_game_round = 0
         self.users_info = []
         self.users_cookie = {}
+        self.users_his_state = [GameState.init for _ in range(6)] # 用户记录的历史状态
+        self.users_error = [False for _ in range(6)] # 用户是否发生异常
         # 牌局变量
+        self.game_lock = threading.Lock()
         self.init_game_env()
         # 玩家
         self.game_init_barrier = threading.Barrier(7)
@@ -43,5 +47,7 @@ class Game_Var:
         self.onlooker_number = 0
         self.onlooker_barrier = threading.Barrier(1)
         self.onlooker_event = threading.Event()
+        # 在游戏还没开始前由manager将其锁住
+        self.onlooker_lock.acquire()
 
 gvar = Game_Var()

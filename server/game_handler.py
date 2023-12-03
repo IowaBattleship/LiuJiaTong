@@ -105,8 +105,8 @@ class Game_Handler(BaseRequestHandler):
                     logger.info(f"{user_name}({self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
-                    gvar.users_info.append((user_name, self.pid))
                     assert self.client_player == -1
+                    gvar.users_info.append((user_name, self.pid))
                     gvar.users_cookie[self.user_cookie] = self.client_player
             else:
                 # 合法就先发送标识，之后考虑恢复的情况

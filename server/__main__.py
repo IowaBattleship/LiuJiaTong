@@ -24,9 +24,9 @@ from logger import init_logger
 import threading
 import argparse
 
-def manager_thread():
+def manager_thread(static_user_order):
     init_logger()
-    manager = Manager()
+    manager = Manager(static_user_order)
     manager.run()
 
 ctrl_c_handler_lock = threading.Lock()
@@ -55,6 +55,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统服务端')
     parser.add_argument('--ip', type=str, default='0.0.0.0', help='listening ip (default: %(default)s)')
     parser.add_argument('--port', type=int, default=8080, help='port (default: %(default)s)')
+    parser.add_argument('-s', '--static', action='store_true', default=False, help='disable reorder users')
     args = parser.parse_args()
 
     if os.name == "posix":
@@ -76,7 +77,7 @@ if __name__ == '__main__':
 
     try:
         server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
-        threading.Thread(target=manager_thread).start()
+        threading.Thread(target=manager_thread,args=(args.static,)).start()
     except Exception as e:
         print("server error:", e)
         os._exit(1)

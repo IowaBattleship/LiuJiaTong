@@ -38,9 +38,10 @@ class Player(GameStateMachine):
             assert(gvar.users_played_cards[self.client_player] == [])
             user_cards, user_played_cards, now_score = \
                 self.tcp_handler.recv_player_reply()
-            gvar.users_cards[self.client_player] = user_cards
-            gvar.users_played_cards[self.client_player] = user_played_cards
-            gvar.now_score = now_score
+            with gvar.game_lock:
+                gvar.users_cards[self.client_player] = user_cards
+                gvar.users_played_cards[self.client_player] = user_played_cards
+                gvar.now_score = now_score
             print(f'Played Cards:{gvar.users_played_cards[self.client_player]}')
         except Exception as e:
             print(os.getpid(), "error :", e)
@@ -66,8 +67,9 @@ class Player(GameStateMachine):
     def next_turn_sync(self): 
         gvar.next_turn_barrier.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
-        self.__game_over = gvar.game_over
-        self.__now_player = gvar.now_player
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
+            self.__now_player = gvar.now_player
     
     # 这个代码太tm抽象了，看我画的drawio的图，为了支持断线重连真不容易……
     def get_next_state(self) -> bool:
@@ -162,8 +164,9 @@ class Player(GameStateMachine):
         _, self.pid = tcp_handler.client_address
         
         self.error = False
-        self.__now_player = 0
-        self.__game_over = 0
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
+            self.__now_player = gvar.now_player
     
     def send_data(self, data):
         self.tcp_handler.send_data(data)
