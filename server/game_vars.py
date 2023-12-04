@@ -2,6 +2,7 @@ import threading
 from state_machine import GameState
 class Game_Var:
     def init_game_env(self):
+        assert self.game_lock.locked()
         self.users_cards = [[] for _ in range(6)]
         self.users_score = [0 for _ in range(6)]
         self.users_finished = [False for _ in range(6)] # 玩家打完所有的牌
@@ -16,13 +17,13 @@ class Game_Var:
         self.game_over = 0 # 游戏结束状态
     
     def init_global_env(self):
-        with self.users_info_lock:
-            assert self.onlooker_lock.locked()
-            self.serving_game_round += 1
-            self.users_info = []
-            self.users_cookie = {}
-            self.users_his_state = [GameState.init for _ in range(6)]
-            self.users_error = [False for _ in range(6)]
+        assert self.users_info_lock.locked()
+        assert self.onlooker_lock.locked()
+        self.serving_game_round += 1
+        self.users_info = []
+        self.users_cookie = {}
+        self.users_his_state = [GameState.init for _ in range(6)]
+        self.users_error = [False for _ in range(6)]
     
     def __init__(self) -> None:
         # 用户登录
@@ -34,7 +35,8 @@ class Game_Var:
         self.users_error = [False for _ in range(6)] # 用户是否发生异常
         # 牌局变量
         self.game_lock = threading.Lock()
-        self.init_game_env()
+        with self.game_lock:
+            self.init_game_env()
         # 玩家
         self.game_init_barrier = threading.Barrier(7)
         self.game_start_barrier = threading.Barrier(7)
@@ -47,7 +49,5 @@ class Game_Var:
         self.onlooker_number = 0
         self.onlooker_barrier = threading.Barrier(1)
         self.onlooker_event = threading.Event()
-        # 在游戏还没开始前由manager将其锁住
-        self.onlooker_lock.acquire()
 
 gvar = Game_Var()

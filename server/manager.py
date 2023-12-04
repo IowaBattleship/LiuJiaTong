@@ -7,6 +7,7 @@ from state_machine import GameState, GameStateMachine
 
 # 初始化牌
 def init_cards():
+    assert gvar.game_lock.locked()
     all_cards = []
     # 3~10,J,Q,K,A,2
     for i in range(3, 16):
@@ -30,6 +31,7 @@ def init_cards():
 2, -2 分别表示奇数队获胜,双统
 '''
 def if_game_over():
+    assert gvar.game_lock.locked()
     # 没有头科肯定没有结束
     if gvar.head_master == -1:
         return 0
@@ -43,6 +45,7 @@ def if_game_over():
 
 # 下一位玩家出牌
 def set_next_player():
+    assert gvar.game_lock.locked()
     gvar.now_player = (gvar.now_player + 1) % 6
     while gvar.users_finished[gvar.now_player]:
         gvar.now_player = (gvar.now_player + 1) % 6
@@ -106,17 +109,19 @@ def get_next_turn():
 
 class Manager(GameStateMachine):
     def game_start(self): 
-        if self.static_user_order:
-            pass
-        else:
-            # 随机出牌顺序
-            with gvar.users_info_lock:
+        with gvar.users_info_lock:
+            logger.info(f"manager: New Game, Round {gvar.serving_game_round}")
+            if self.static_user_order:
+                pass
+            else:
+                # 随机出牌顺序
                 random.shuffle(gvar.users_info)
         with gvar.game_lock:
             gvar.init_game_env()
             init_cards()  # 初始化牌并发牌
     def game_over(self): 
-        gvar.init_global_env()
+        with gvar.users_info_lock:
+            gvar.init_global_env()
     def onlooker_register(self): 
         raise RuntimeError("unsupport state")
     def next_turn(self): 
@@ -195,7 +200,10 @@ class Manager(GameStateMachine):
     def __init__(self, static_user_order):
         super().__init__()
 
-        gvar.init_global_env()
-
-        self.__game_over = 0
+        # 在游戏还没开始前由manager将其锁住
+        gvar.onlooker_lock.acquire()
+        with gvar.users_info_lock:
+            gvar.init_global_env()
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
         self.static_user_order = static_user_order

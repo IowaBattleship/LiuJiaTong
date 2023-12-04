@@ -8,18 +8,17 @@ class Onlooker(GameStateMachine):
         raise RuntimeError("unsupport state")
     def game_over(self): 
         print(f"onlooker {self.pid} exit")
-        self.close()
+        self.tcp_handler.close()
     def onlooker_register(self): 
         try:
             while True:
                 if_locked = gvar.onlooker_lock.acquire(timeout=1)
-                if self.serving_game_round < gvar.serving_game_round:
-                    raise RuntimeError("Game end")
-                if if_locked and self.error is False:
-                    gvar.onlooker_number += 1
+                with gvar.users_info_lock:
+                    if self.serving_game_round < gvar.serving_game_round:
+                        raise RuntimeError("Game end")
                 if if_locked:
+                    gvar.onlooker_number += 1
                     gvar.onlooker_lock.release()
-                if if_locked or self.error:
                     break
         except Exception as e:
             print(f"onlooker {self.pid}({self.state}) error: {e}")
@@ -36,7 +35,8 @@ class Onlooker(GameStateMachine):
         if self.error:
             return
         try:
-            self.tcp_handler.send_round_info()
+            with gvar.game_lock:
+                self.tcp_handler.send_round_info()
         except Exception as e:
             print(f"onlooker {self.pid}({self.state}) error: {e}")
             self.error = True
@@ -104,12 +104,3 @@ class Onlooker(GameStateMachine):
         self.error = False
         with gvar.game_lock:
             self.__game_over = gvar.game_over
-    
-    def send_data(self, data):
-        self.tcp_handler.send_data(data)
-    
-    def recv_data(self):
-        return self.tcp_handler.recv_data()
-    
-    def close(self):
-        self.tcp_handler.close()

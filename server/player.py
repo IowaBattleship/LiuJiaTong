@@ -13,7 +13,7 @@ class Player(GameStateMachine):
                 gvar.users_error[self.client_player] = True
         else:
             print(f"player {self.client_player} exit")
-        self.close()
+        self.tcp_handler.close()
     def onlooker_register(self): 
         raise RuntimeError("unsupport state")
     def next_turn(self): 
@@ -27,7 +27,8 @@ class Player(GameStateMachine):
     def send_round_info(self): 
         assert self.error is False
         try:
-            self.tcp_handler.send_round_info()
+            with gvar.game_lock:
+                self.tcp_handler.send_round_info()
         except Exception as e:
             print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
             self.error = True
@@ -36,15 +37,15 @@ class Player(GameStateMachine):
         try:
             with gvar.users_info_lock:
                 print(f"Now Round:{self.client_player} -> {gvar.users_info[self.client_player]}")
-            with gvar.game_lock:
-                assert(gvar.users_played_cards[self.client_player] == [])
             user_cards, user_played_cards, now_score = \
                 self.tcp_handler.recv_player_reply()
             with gvar.game_lock:
+                assert gvar.users_played_cards[self.client_player] == [], \
+                    gvar.users_played_cards[self.client_player]
                 gvar.users_cards[self.client_player] = user_cards
                 gvar.users_played_cards[self.client_player] = user_played_cards
                 gvar.now_score = now_score
-            print(f'Played Cards:{gvar.users_played_cards[self.client_player]}')
+                print(f'Played Cards:{gvar.users_played_cards[self.client_player]}')
         except Exception as e:
             print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
             self.error = True
@@ -61,6 +62,7 @@ class Player(GameStateMachine):
                 next((i for i, (_, user_pid) in enumerate(gvar.users_info) if self.pid == user_pid), 0)
             user_name, _ = gvar.users_info[self.client_player]
             gvar.users_cookie[self.tcp_handler.user_cookie] = self.client_player
+            self.tcp_handler.users_name = [user_name for user_name, _ in gvar.users_info]
         logger.info(f"{user_name}({self.pid}) -> client_player: {self.client_player}")
     def send_round_info_sync(self): 
         gvar.send_round_info_barrier.wait()
@@ -169,12 +171,3 @@ class Player(GameStateMachine):
         with gvar.game_lock:
             self.__game_over = gvar.game_over
             self.__now_player = gvar.now_player
-    
-    def send_data(self, data):
-        self.tcp_handler.send_data(data)
-    
-    def recv_data(self):
-        return self.tcp_handler.recv_data()
-    
-    def close(self):
-        self.tcp_handler.close()

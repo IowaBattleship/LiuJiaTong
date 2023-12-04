@@ -20,6 +20,7 @@ class Game_Handler(BaseRequestHandler):
         self.user_cookie = None
         self.his_state = None
         self.pid = 0
+        self.users_name = []
         
         super().__init__(request, client_address, server)
 
@@ -43,11 +44,12 @@ class Game_Handler(BaseRequestHandler):
     def send_field_info(self):
         # 玩家/旁观者
         self.send_data(self.is_player)
-        users_name = [user_name for user_name, _ in gvar.users_info]
-        self.send_data(users_name)
+        assert len(self.users_name) == 6, self.users_name
+        self.send_data(self.users_name)
         self.send_data(self.client_player)
     
     def send_round_info(self):
+        assert gvar.game_lock.locked()
         self.send_data(gvar.game_over)
         self.send_data(gvar.users_score)
         # 用户手牌数
@@ -94,7 +96,8 @@ class Game_Handler(BaseRequestHandler):
                     self.is_player = False
                     self.client_player = random.randint(0, 5)
                     self.send_data(None)
-                    print(f"{user_name}({self.pid}) joined game. It is a onlooker")
+                    print(f"{user_name}({self.pid}) joined game. It is a onlooker -> player {self.client_player}")
+                    self.users_name = [user_name for user_name, _ in gvar.users_info]
                 else:
                     self.is_player = True
                     self.client_player = -1
@@ -137,6 +140,7 @@ class Game_Handler(BaseRequestHandler):
                     user_name, old_pid = gvar.users_info[self.client_player]
                     gvar.users_info[self.client_player] = (user_name, self.pid)
                     print(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
+                    self.users_name = [user_name for user_name, _ in gvar.users_info]
                     return True
                 else:
                     self.send_data(False)
