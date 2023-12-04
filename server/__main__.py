@@ -23,6 +23,7 @@ from manager import Manager
 from logger import init_logger
 import threading
 import argparse
+import utils
 
 def manager_thread(static_user_order):
     init_logger()
@@ -34,22 +35,9 @@ def ctrl_c_handler():
     if ctrl_c_handler_lock.locked():
         return
     with ctrl_c_handler_lock:
-        while True:
-            print("是否强退服务端？[y/N]: ", end='')
-            while True:
-                try:
-                    resp = input().upper()
-                except EOFError:
-                    pass
-                else:
-                    break
-            if resp in ['', 'N', 'Y']:
-                if resp == 'Y':
-                    print("Keyboard Interrupt")
-                    os._exit(1)
-                break
-            else:
-                print(f"非法输入，", end='')
+        if utils.user_confirm(prompt="是否强退服务端？",default=False) is True:
+            print("Keyboard Interrupt")
+            os._exit(1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统服务端')

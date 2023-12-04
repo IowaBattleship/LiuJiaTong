@@ -111,20 +111,10 @@ class Client:
                 print(f"IP地址: {self.config.ip}")
                 print(f"端口:   {self.config.port}")
                 print(f"用户名: {self.config.name}")
-                print(f"是否使用配置？[Y/n]: ", end='')
-                while True:
-                    resp = input().upper()
-                    if resp in ['', 'Y']:
-                        break
-                    elif resp == 'N':
-                        self.config = None
-                        break
-                    else:
-                        print(f"非法输入: ", end='')
-            
+                if utils.user_confirm(prompt="是否使用配置？", default=True) is False:
+                    self.config = None
             if self.config is not None:
                 break
-            
             while True:
                 ip = input(f"请输入IP地址: ")
                 port = input(f"请输入端口: ")

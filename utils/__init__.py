@@ -63,3 +63,24 @@ def columns(string: str) -> int:
         else:
             columns += 1
     return columns
+
+def user_confirm(prompt: str, default: bool):
+    while True:
+        print(prompt, end='')
+        print("[Y/n]" if default is True else "[y/N]", end='')
+        print(": ", end='')
+        while True:
+            try:
+                resp = input().upper()
+            except EOFError:
+                pass
+            else:
+                break
+        if resp == '':
+            return default
+        elif resp == 'Y':
+            return True
+        elif resp == 'N':
+            return False
+        else:
+            print(f"非法输入，", end='')

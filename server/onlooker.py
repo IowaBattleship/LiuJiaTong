@@ -10,24 +10,27 @@ class Onlooker(GameStateMachine):
         print(f"onlooker {self.pid} exit")
         self.close()
     def onlooker_register(self): 
-        while True:
-            if_locked = gvar.onlooker_lock.acquire(timeout=1)
-            if self.serving_game_round < gvar.serving_game_round:
-                print(os.getpid(), "onlooker register failed: game end")
-                self.error = True
-            if if_locked and self.error is False:
-                gvar.onlooker_number += 1
-            if if_locked:
-                gvar.onlooker_lock.release()
-            if if_locked or self.error:
-                break
+        try:
+            while True:
+                if_locked = gvar.onlooker_lock.acquire(timeout=1)
+                if self.serving_game_round < gvar.serving_game_round:
+                    raise RuntimeError("Game end")
+                if if_locked and self.error is False:
+                    gvar.onlooker_number += 1
+                if if_locked:
+                    gvar.onlooker_lock.release()
+                if if_locked or self.error:
+                    break
+        except Exception as e:
+            print(f"onlooker {self.pid}({self.state}) error: {e}")
+            self.error = True
     def next_turn(self): 
         raise RuntimeError("unsupport state")
     def send_field_info(self): 
         try:
             self.tcp_handler.send_field_info()
         except Exception as e:
-            print(os.getpid(), "error :", e)
+            print(f"onlooker {self.pid}({self.state}) error: {e}")
             self.error = True
     def send_round_info(self): 
         if self.error:
@@ -35,7 +38,7 @@ class Onlooker(GameStateMachine):
         try:
             self.tcp_handler.send_round_info()
         except Exception as e:
-            print(os.getpid(), "error :", e)
+            print(f"onlooker {self.pid}({self.state}) error: {e}")
             self.error = True
     def recv_player_info(self): 
         raise RuntimeError("unsupport state")
@@ -83,7 +86,7 @@ class Onlooker(GameStateMachine):
             return False
         else:
             raise RuntimeError("unsupport state")
-        logger.info(f"onlooker: state={self.state}, error={self.error}")
+        logger.info(f"onlooker {self.pid}({self.state}, error={self.error})")
         return True
     
     def __init__(

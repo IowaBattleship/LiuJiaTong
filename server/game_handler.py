@@ -94,14 +94,14 @@ class Game_Handler(BaseRequestHandler):
                     self.is_player = False
                     self.client_player = random.randint(0, 5)
                     self.send_data(None)
-                    print(f"{user_name} joined game. It is a onlooker")
+                    print(f"{user_name}({self.pid}) joined game. It is a onlooker")
                 else:
                     self.is_player = True
                     self.client_player = -1
                     # 生成cookie
                     self.user_cookie = self.generate_cookie()
                     self.send_data(self.user_cookie)
-                    print(f"{user_name} joined game. It is a player. cookie: {self.user_cookie}")
+                    print(f"{user_name}({self.pid}) joined game. It is a player. cookie: {self.user_cookie}")
                     logger.info(f"{user_name}({self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
@@ -114,7 +114,7 @@ class Game_Handler(BaseRequestHandler):
                 self.is_recovery = True
                 self.is_player = True
         except Exception as e:
-            print("recv user info error:", e)
+            print(f"{self.pid} error recieving user info:", e)
             return False
         else:
             return True
@@ -127,25 +127,28 @@ class Game_Handler(BaseRequestHandler):
             with gvar.users_info_lock:
                 self.client_player = gvar.users_cookie[self.user_cookie]
         # 需要判断是否能够实现正确恢复,最多只有一个线程能够恢复
-        print(f"valid cookie {self.user_cookie} -> {self.client_player}")
+        print(f"{self.pid}: valid cookie {self.user_cookie} -> {self.client_player}")
         try:
             with gvar.users_info_lock:
                 if gvar.users_error[self.client_player]:
                     self.send_data(True)
                     self.his_state = gvar.users_his_state[self.client_player]
                     gvar.users_error[self.client_player] = False
+                    user_name, old_pid = gvar.users_info[self.client_player]
+                    gvar.users_info[self.client_player] = (user_name, self.pid)
+                    print(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
                     return True
                 else:
                     self.send_data(False)
                     return False
         except Exception as e:
-            print("try recovery error:", e)
+            print(f"{self.pid} error recovering:", e)
             return False
 
     def handle(self):        
         with gvar.users_info_lock:
             address, self.pid = self.client_address
-            print(f'{address} connected, pid = {self.pid}')
+            print(f'{address}({self.pid}) connected')
             self.serving_game_round = gvar.serving_game_round
             if self.recv_user_info() is False:
                 return

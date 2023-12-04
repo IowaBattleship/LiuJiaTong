@@ -22,20 +22,22 @@ class Player(GameStateMachine):
         try:
             self.tcp_handler.send_field_info()
         except Exception as e:
-            print(os.getpid(), "error :", e)
+            print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
             self.error = True
     def send_round_info(self): 
         assert self.error is False
         try:
             self.tcp_handler.send_round_info()
         except Exception as e:
-            print(os.getpid(), "error :", e)
+            print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
             self.error = True
     def recv_player_info(self): 
         assert self.error is False
         try:
-            print(f'Now Round:{gvar.users_info[self.client_player]}')
-            assert(gvar.users_played_cards[self.client_player] == [])
+            with gvar.users_info_lock:
+                print(f"Now Round:{self.client_player} -> {gvar.users_info[self.client_player]}")
+            with gvar.game_lock:
+                assert(gvar.users_played_cards[self.client_player] == [])
             user_cards, user_played_cards, now_score = \
                 self.tcp_handler.recv_player_reply()
             with gvar.game_lock:
@@ -44,7 +46,7 @@ class Player(GameStateMachine):
                 gvar.now_score = now_score
             print(f'Played Cards:{gvar.users_played_cards[self.client_player]}')
         except Exception as e:
-            print(os.getpid(), "error :", e)
+            print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
             self.error = True
     def init_sync(self): 
         gvar.game_init_barrier.wait()
@@ -148,7 +150,7 @@ class Player(GameStateMachine):
         if recovery is False and self.error is False:
             with gvar.users_info_lock:
                 gvar.users_his_state[self.client_player] = self.state
-        logger.info(f"player {self.client_player}: state={self.state}, error={self.error}")
+        logger.info(f"player {self.client_player}({self.state}, error={self.error})")
         return True
 
     def __init__(

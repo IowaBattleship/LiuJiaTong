@@ -110,9 +110,11 @@ class Manager(GameStateMachine):
             pass
         else:
             # 随机出牌顺序
-            random.shuffle(gvar.users_info)
-        gvar.init_game_env()
-        init_cards()  # 初始化牌并发牌
+            with gvar.users_info_lock:
+                random.shuffle(gvar.users_info)
+        with gvar.game_lock:
+            gvar.init_game_env()
+            init_cards()  # 初始化牌并发牌
     def game_over(self): 
         gvar.init_global_env()
     def onlooker_register(self): 
