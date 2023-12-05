@@ -1,10 +1,8 @@
 import json
-import random
 import struct
 import secrets
 import string
 import time
-import random
 import logger
 from player import Player
 from onlooker import Onlooker
@@ -94,17 +92,19 @@ class Game_Handler(BaseRequestHandler):
                 user_name = self.recv_data()
                 if user_idx == 6:
                     self.is_player = False
-                    self.client_player = random.randint(0, 5)
+                    self.client_player = secrets.randbelow(6)
                     self.send_data(None)
-                    print(f"{user_name}({self.pid}) joined game. It is a onlooker -> player {self.client_player}")
+                    print(f"\x1b[32m\x1b[1mOnlooker {user_name}({self.pid}) joined game -> player: {self.client_player}\x1b[0m")
                     self.users_name = [user_name for user_name, _ in gvar.users_info]
                 else:
                     self.is_player = True
                     self.client_player = -1
                     # 生成cookie
                     self.user_cookie = self.generate_cookie()
+                    while gvar.users_cookie.get(self.user_cookie) is not None:
+                        self.user_cookie = self.generate_cookie()
                     self.send_data(self.user_cookie)
-                    print(f"{user_name}({self.pid}) joined game. It is a player. cookie: {self.user_cookie}")
+                    print(f"\x1b[32m\x1b[1mPlayer {user_name}({self.pid}) joined game -> cookie: {self.user_cookie}\x1b[0m")
                     logger.info(f"{user_name}({self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
@@ -117,7 +117,7 @@ class Game_Handler(BaseRequestHandler):
                 self.is_recovery = True
                 self.is_player = True
         except Exception as e:
-            print(f"{self.pid} error recieving user info:", e)
+            print(f"\x1b[31m\x1b[1m{self.pid} error recieving user info: {e}\x1b[0m")
             return False
         else:
             return True
@@ -130,7 +130,7 @@ class Game_Handler(BaseRequestHandler):
             with gvar.users_info_lock:
                 self.client_player = gvar.users_cookie[self.user_cookie]
         # 需要判断是否能够实现正确恢复,最多只有一个线程能够恢复
-        print(f"{self.pid}: valid cookie {self.user_cookie} -> {self.client_player}")
+        print(f"{self.pid}: valid cookie {self.user_cookie} -> player {self.client_player}")
         try:
             with gvar.users_info_lock:
                 if gvar.users_error[self.client_player]:
@@ -139,14 +139,15 @@ class Game_Handler(BaseRequestHandler):
                     gvar.users_error[self.client_player] = False
                     user_name, old_pid = gvar.users_info[self.client_player]
                     gvar.users_info[self.client_player] = (user_name, self.pid)
-                    print(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
+                    print(f"\x1b[32m\x1b[1m{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}\x1b[0m")
                     self.users_name = [user_name for user_name, _ in gvar.users_info]
                     return True
                 else:
                     self.send_data(False)
+                    print(f"\x1b[33m\x1b[1m{self.pid} recover failed\x1b[0m")
                     return False
         except Exception as e:
-            print(f"{self.pid} error recovering:", e)
+            print(f"\x1b[31m\x1b[1m{self.pid} error recovering: {e}\x1b[0m")
             return False
 
     def handle(self):        

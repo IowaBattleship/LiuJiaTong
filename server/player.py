@@ -5,24 +5,24 @@ from state_machine import GameState, GameStateMachine
 
 class Player(GameStateMachine):
     def game_start(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def game_over(self): 
         if self.error:
-            print(f"player {self.client_player} error exit")
+            print(f"Player {self.pid}({self.client_player}) error exit")
             with gvar.users_info_lock:
                 gvar.users_error[self.client_player] = True
         else:
-            print(f"player {self.client_player} exit")
+            print(f"Player {self.pid}({self.client_player}) exit")
         self.tcp_handler.close()
     def onlooker_register(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def next_turn(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def send_field_info(self): 
         try:
             self.tcp_handler.send_field_info()
         except Exception as e:
-            print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
+            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def send_round_info(self): 
         assert self.error is False
@@ -30,13 +30,13 @@ class Player(GameStateMachine):
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
         except Exception as e:
-            print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
+            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def recv_player_info(self): 
         assert self.error is False
         try:
             with gvar.users_info_lock:
-                print(f"Now Round:{self.client_player} -> {gvar.users_info[self.client_player]}")
+                print(f"Now round:{self.client_player} -> {gvar.users_info[self.client_player]}")
             user_cards, user_played_cards, now_score = \
                 self.tcp_handler.recv_player_reply()
             with gvar.game_lock:
@@ -45,14 +45,14 @@ class Player(GameStateMachine):
                 gvar.users_cards[self.client_player] = user_cards
                 gvar.users_played_cards[self.client_player] = user_played_cards
                 gvar.now_score = now_score
-                print(f'Played Cards:{gvar.users_played_cards[self.client_player]}')
+                print(f'Player {self.pid}({self.client_player}) played cards:{gvar.users_played_cards[self.client_player]}')
         except Exception as e:
-            print(f"player {self.pid}({self.client_player}, {self.state}) error: {e}")
+            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def init_sync(self): 
         gvar.game_init_barrier.wait()
     def onlooker_sync(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def game_start_sync(self): 
         gvar.game_start_barrier.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
@@ -148,11 +148,11 @@ class Player(GameStateMachine):
             assert self.his_state is None, self.his_state
             return False
         else:
-            raise RuntimeError("unsupport state")
+            raise RuntimeError("Unsupport state")
         if recovery is False and self.error is False:
             with gvar.users_info_lock:
                 gvar.users_his_state[self.client_player] = self.state
-        logger.info(f"player {self.client_player}({self.state}, error={self.error})")
+        logger.info(f"Player {self.client_player}({self.state}, error={self.error})")
         return True
 
     def __init__(

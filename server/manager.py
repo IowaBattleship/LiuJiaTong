@@ -110,7 +110,7 @@ def get_next_turn():
 class Manager(GameStateMachine):
     def game_start(self): 
         with gvar.users_info_lock:
-            logger.info(f"manager: New Game, Round {gvar.serving_game_round}")
+            logger.info(f"Manager: New game --- Round {gvar.serving_game_round}")
             if self.static_user_order:
                 pass
             else:
@@ -123,12 +123,12 @@ class Manager(GameStateMachine):
         with gvar.users_info_lock:
             gvar.init_global_env()
     def onlooker_register(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def next_turn(self): 
         with gvar.game_lock:
             get_next_turn()
     def send_field_info(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def send_round_info(self): 
         # 会在send_round_info_sync处放掉
         gvar.onlooker_lock.acquire()
@@ -138,12 +138,12 @@ class Manager(GameStateMachine):
         gvar.onlooker_event.clear()
         gvar.onlooker_barrier.wait()
     def recv_player_info(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def init_sync(self): 
         gvar.game_init_barrier.wait()
         gvar.game_init_barrier.reset()
     def onlooker_sync(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def game_start_sync(self): 
         gvar.game_start_barrier.wait()
         gvar.game_start_barrier.reset()
@@ -193,8 +193,8 @@ class Manager(GameStateMachine):
         elif self.state == GameState.game_over:
             self.state = GameState.init_sync
         else:
-            raise RuntimeError("unsupport state")
-        logger.info(f"manager: {self.state}")
+            raise RuntimeError("Unsupport state")
+        logger.info(f"Manager: {self.state}")
         return True
 
     def __init__(self, static_user_order):

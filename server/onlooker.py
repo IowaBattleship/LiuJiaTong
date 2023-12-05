@@ -5,9 +5,9 @@ from state_machine import GameState, GameStateMachine
 
 class Onlooker(GameStateMachine):
     def game_start(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def game_over(self): 
-        print(f"onlooker {self.pid} exit")
+        print(f"Onlooker {self.pid} exit")
         self.tcp_handler.close()
     def onlooker_register(self): 
         try:
@@ -21,15 +21,15 @@ class Onlooker(GameStateMachine):
                     gvar.onlooker_lock.release()
                     break
         except Exception as e:
-            print(f"onlooker {self.pid}({self.state}) error: {e}")
+            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
             self.error = True
     def next_turn(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def send_field_info(self): 
         try:
             self.tcp_handler.send_field_info()
         except Exception as e:
-            print(f"onlooker {self.pid}({self.state}) error: {e}")
+            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
             self.error = True
     def send_round_info(self): 
         if self.error:
@@ -38,19 +38,19 @@ class Onlooker(GameStateMachine):
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
         except Exception as e:
-            print(f"onlooker {self.pid}({self.state}) error: {e}")
+            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
             self.error = True
     def recv_player_info(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def init_sync(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def onlooker_sync(self): 
         gvar.onlooker_event.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
         with gvar.game_lock:
             self.__game_over = gvar.game_over
     def game_start_sync(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def send_round_info_sync(self): 
         if self.error:
             assert gvar.onlooker_lock.locked()
@@ -58,9 +58,9 @@ class Onlooker(GameStateMachine):
                 gvar.onlooker_number -= 1
         gvar.onlooker_barrier.wait()
     def recv_player_info_sync(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     def next_turn_sync(self): 
-        raise RuntimeError("unsupport state")
+        raise RuntimeError("Unsupport state")
     
     # 这个代码太tm抽象了，看我画的drawio的图，为了支持断线重连真不容易……
     def get_next_state(self) -> bool:
@@ -85,8 +85,8 @@ class Onlooker(GameStateMachine):
         elif self.state == GameState.game_over:
             return False
         else:
-            raise RuntimeError("unsupport state")
-        logger.info(f"onlooker {self.pid}({self.state}, error={self.error})")
+            raise RuntimeError("Unsupport state")
+        logger.info(f"Onlooker {self.pid}({self.state}, error={self.error})")
         return True
     
     def __init__(

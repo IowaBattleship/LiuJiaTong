@@ -109,7 +109,7 @@ elif platform.system() == "Windows":
                 return conn.status == 'ESTABLISHED'
         return False
 else:
-    raise RuntimeError("unknown os")
+    raise RuntimeError("Unknown os")
 
 # io系列函数
 # now_played_cards: 用户已经输入好的字符串

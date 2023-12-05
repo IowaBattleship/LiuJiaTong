@@ -61,13 +61,13 @@ if __name__ == '__main__':
         # 注册控制台事件处理程序
         win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
     else:
-        raise RuntimeError("unknown os")
+        raise RuntimeError("Unknown os")
 
     try:
         server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
         threading.Thread(target=manager_thread,args=(args.static,)).start()
     except Exception as e:
-        print("server error:", e)
+        print(f"\x1b[31m\x1b[1mserver error: {e}\x1b[0m")
         os._exit(1)
     print("Listening")
     server.serve_forever()

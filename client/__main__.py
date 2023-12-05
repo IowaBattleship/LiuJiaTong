@@ -143,9 +143,9 @@ class Client:
             else:
                 if_connected = True
         if if_connected:
-            print("Connect succeeded")
+            print("\x1b[32m\x1b[1mConnect succeeded\x1b[0m")
         else:
-            print("Connect failed")
+            print("\x1b[31m\x1b[1mConnect failed\x1b[0m")
         return if_connected
 
     def close(self):
@@ -180,10 +180,10 @@ class Client:
         # 重发cookie的同时还得同步用户名
         if_valid_cookie = self.recv_data()
         if if_valid_cookie:
-            print("Start recovery")
+            print("Start recovering")
             if_recovery = self.recv_data()
             if if_recovery is False:
-                print("Recovery failed, may someone are running this yet?")
+                print("\x1b[31m\x1b[1mRecovery failed, may someone are running this yet?\x1b[0m")
                 return False
         else:
             print("Start game")
@@ -291,7 +291,7 @@ if __name__ == '__main__':
         # 注册控制台事件处理程序
         win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
     else:
-        raise RuntimeError("unknown os")
+        raise RuntimeError("Unknown os")
 
     logger.init_logger()
 
