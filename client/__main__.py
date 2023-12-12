@@ -267,6 +267,10 @@ class Client:
                 self.now_score += new_score
                 self.send_player_info()
 
+def ctrl_c_handler():
+    print("Keyboard Interrupt")
+    os._exit(1)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统客户端')
     parser.add_argument('--ip', type=str, help='ip address')
@@ -275,25 +279,8 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--no-cookie', action='store_true', default=False, help='disable cookies')
     args = parser.parse_args()
 
-    if os.name == "posix":
-        import signal
-        def ctrl_c_handler(sig, frame):
-            print("Keyboard Interrupt")
-            os._exit(1)
-        signal.signal(signal.SIGINT, ctrl_c_handler)
-    elif os.name == "nt":
-        import win32api
-        import win32con
-        def console_ctrl_handler(ctrl_type):
-            if ctrl_type == win32con.CTRL_C_EVENT:
-                print("Keyboard Interrupt")
-                os._exit(1)
-        # 注册控制台事件处理程序
-        win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
-    else:
-        raise RuntimeError("Unknown os")
-
     logger.init_logger()
+    utils.register_signal_handler(ctrl_c_handler)
 
     client = Client(args.no_cookie)
     if args.ip == None or args.port == None or args.user_name == None:

@@ -20,13 +20,12 @@ if if_need_restart:
 from socketserver import ThreadingTCPServer
 from game_handler import Game_Handler
 from manager import Manager
-from logger import init_logger
+import logger
 import threading
 import argparse
 import utils
 
 def manager_thread(static_user_order):
-    init_logger()
     manager = Manager(static_user_order)
     manager.run()
 
@@ -46,24 +45,9 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--static', action='store_true', default=False, help='disable reorder users')
     args = parser.parse_args()
 
-    if os.name == "posix":
-        import signal
-        def console_ctrl_handler(sig, frame):
-            ctrl_c_handler()
-        signal.signal(signal.SIGINT, console_ctrl_handler)
-    elif os.name == "nt":
-        import win32api
-        import win32con
-        def console_ctrl_handler(ctrl_type):
-            if ctrl_type == win32con.CTRL_C_EVENT:
-                threading.Thread(target=ctrl_c_handler).start()
-                return True
-        # 注册控制台事件处理程序
-        win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
-    else:
-        raise RuntimeError("Unknown os")
-
     try:
+        logger.init_logger()
+        utils.register_signal_handler(ctrl_c_handler)
         server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
         threading.Thread(target=manager_thread,args=(args.static,)).start()
     except Exception as e:

@@ -1,3 +1,6 @@
+import os
+import threading
+
 def str_to_int(c=''):
     if '3' <= c <= '9':
         return int(c)
@@ -84,3 +87,21 @@ def user_confirm(prompt: str, default: bool):
             return False
         else:
             print(f"非法输入，", end='')
+
+def register_signal_handler(ctrl_c_handler):
+    if os.name == "posix":
+        import signal
+        def console_ctrl_handler(sig, frame):
+            threading.Thread(target=ctrl_c_handler).start()
+        signal.signal(signal.SIGINT, console_ctrl_handler)
+    elif os.name == "nt":
+        import win32api
+        import win32con
+        def console_ctrl_handler(ctrl_type):
+            if ctrl_type == win32con.CTRL_C_EVENT:
+                threading.Thread(target=ctrl_c_handler).start()
+                return True
+        # 注册控制台事件处理程序
+        win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
+    else:
+        raise RuntimeError("Unknown os")
