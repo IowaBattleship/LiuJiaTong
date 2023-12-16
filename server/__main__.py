@@ -1,29 +1,19 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import importlib
-if_need_restart = False
-def check_package(package, install=None):
-    try:
-        importlib.import_module(package)
-    except ImportError:
-        os.system(f"pip3 install {package if install is None else install}")
-        global if_need_restart; if_need_restart = True
-if os.name == 'nt':
-    check_package("win32api", "pypiwin32")
-    check_package("win32con", "pypiwin32")
-if if_need_restart:
-    print("\x1b[32m\x1b[1mPackages are installed, please restart program to update system enviroment\x1b[0m")
-    os._exit(0)
-
+import utils
+utils.check_packages({
+    "nt": [
+        ("win32api", "pypiwin32"),
+        ("win32con", "pypiwin32"),
+    ],
+})
 from socketserver import ThreadingTCPServer
 from game_handler import Game_Handler
 from manager import Manager
 import logger
 import threading
 import argparse
-import utils
 
 def manager_thread(static_user_order):
     manager = Manager(static_user_order)

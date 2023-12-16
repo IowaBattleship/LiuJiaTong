@@ -88,6 +88,27 @@ def user_confirm(prompt: str, default: bool):
         else:
             print(f"非法输入，", end='')
 
+import importlib
+if_need_restart = False
+def __try_to_import(package_info):
+    global if_need_restart
+    package, install = package_info
+    try:
+        importlib.import_module(package)
+    except ImportError:
+        os.system(f"pip3 install {package if install is None else install}")
+        if_need_restart = True
+
+def check_packages(packages: dict):
+    global if_need_restart
+    for package_info in packages.get(os.name, []):
+        __try_to_import(package_info)
+    for package_info in packages.get("default", []):
+        __try_to_import(package_info)
+    if if_need_restart:
+        print("\x1b[32m\x1b[1mPackages are installed, please restart program to update system enviroment\x1b[0m")
+        os._exit(0)
+
 def register_signal_handler(ctrl_c_handler):
     if os.name == "posix":
         import signal
