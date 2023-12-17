@@ -1,4 +1,3 @@
-import os
 import logger
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
@@ -8,9 +7,13 @@ class Player(GameStateMachine):
         raise RuntimeError("Unsupport state")
     def game_over(self): 
         if self.error:
-            print(f"Player {self.pid}({self.client_player}) error exit")
+            user_cookie = None
             with gvar.users_info_lock:
                 gvar.users_error[self.client_player] = True
+                for cookie, client_player in gvar.users_cookie.items():
+                    if client_player == self.client_player:
+                        user_cookie = cookie
+            print(f"Player {self.pid}({self.client_player}) error exit -> {user_cookie}")
         else:
             print(f"Player {self.pid}({self.client_player}) exit")
         self.tcp_handler.close()
@@ -21,7 +24,7 @@ class Player(GameStateMachine):
     def send_field_info(self): 
         try:
             self.tcp_handler.send_field_info()
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def send_round_info(self): 
@@ -29,7 +32,7 @@ class Player(GameStateMachine):
         try:
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def recv_player_info(self): 
@@ -37,6 +40,9 @@ class Player(GameStateMachine):
         try:
             with gvar.users_info_lock:
                 print(f"Now round:{self.client_player} -> {gvar.users_info[self.client_player]}")
+            # 等客户端的heartbeat返回值为真，意味着出了有效牌
+            while self.tcp_handler.recv_playing_heartbeat() is False:
+                pass
             user_cards, user_played_cards, now_score = \
                 self.tcp_handler.recv_player_reply()
             with gvar.game_lock:
@@ -46,7 +52,7 @@ class Player(GameStateMachine):
                 gvar.users_played_cards[self.client_player] = user_played_cards
                 gvar.now_score = now_score
                 print(f'Player {self.pid}({self.client_player}) played cards:{gvar.users_played_cards[self.client_player]}')
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def init_sync(self): 
@@ -78,19 +84,24 @@ class Player(GameStateMachine):
     # 这个代码太tm抽象了，看我画的drawio的图，为了支持断线重连真不容易……
     def get_next_state(self) -> bool:
         recovery = False
+        def need_recovery():
+            if self.state == GameState.init:
+                self.state = GameState.send_field_info
+            elif self.state == GameState.send_field_info:
+                self.state = GameState.send_round_info
+            elif self.state == GameState.send_round_info:
+                self.state = GameState.recv_player_info
+            else:
+                raise RuntimeError(f"unknown state: {self.state}")
+            if self.state == self.his_state:
+                self.his_state = None
+            nonlocal recovery; recovery = True
+        
         if self.state == GameState.init:
             if self.his_state is None:
                 self.state = GameState.init_sync
             else:
-                assert self.his_state in [
-                    GameState.send_field_info, 
-                    GameState.send_round_info,
-                    GameState.recv_player_info,
-                ], self.his_state
-                self.state = GameState.send_field_info
-                if self.state == self.his_state:
-                    self.his_state = None
-                recovery = True
+                need_recovery()
         elif self.state == GameState.init_sync:
             assert self.his_state is None, self.his_state
             self.state = GameState.game_start_sync
@@ -103,27 +114,14 @@ class Player(GameStateMachine):
             elif self.his_state is None:
                 self.state = GameState.send_round_info
             else:
-                assert self.his_state in [
-                    GameState.send_round_info,
-                    GameState.recv_player_info,
-                ], self.his_state
-                self.state = GameState.send_round_info
-                if self.state == self.his_state:
-                    self.his_state = None
-                recovery = True
+                need_recovery()
         elif self.state == GameState.send_round_info:
             if self.error:
                 self.state = GameState.game_over
             elif self.his_state is None:
                 self.state = GameState.send_round_info_sync
             else:
-                assert self.his_state in [
-                    GameState.recv_player_info,
-                ], self.his_state
-                self.state = GameState.recv_player_info
-                if self.state == self.his_state:
-                    self.his_state = None
-                recovery = True
+                need_recovery()
         elif self.state == GameState.send_round_info_sync:
             assert self.his_state is None, self.his_state
             if self.__game_over != 0:
@@ -136,7 +134,7 @@ class Player(GameStateMachine):
             assert self.his_state is None, self.his_state
             if self.error:
                 self.state = GameState.game_over
-            elif self.his_state is None:
+            else:
                 self.state = GameState.recv_player_info_sync
         elif self.state == GameState.recv_player_info_sync:
             assert self.his_state is None, self.his_state
@@ -164,6 +162,12 @@ class Player(GameStateMachine):
         super().__init__()
         self.client_player = client_player
         self.his_state = his_state
+        assert self.his_state in [
+            None,
+            GameState.send_field_info, 
+            GameState.send_round_info,
+            GameState.recv_player_info,
+        ], self.his_state
         self.tcp_handler = tcp_handler
         _, self.pid = tcp_handler.client_address
         

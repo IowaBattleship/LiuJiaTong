@@ -1,12 +1,9 @@
 import utils
-import socket 
 import os
 import sys
 import time
 import select
-import psutil
 import logger
-import platform
 from enum import Enum
 import utils
 from playingrules import if_input_legal
@@ -86,30 +83,10 @@ class InputException(Exception):
         return repr(self.value)
 
 g_terminal_handler = TerminalHandler()
-g_client_socket = socket.socket()
+g_tcp_handler = None
 
-if platform.system() == "Darwin":
-    def check_tcp_connection():
-        try:
-            raddr = g_client_socket.getpeername()
-            for conn in psutil.net_connections('tcp'):
-                if conn.raddr == raddr:
-                    return conn.status == 'ESTABLISHED'
-            return False
-        except psutil.AccessDenied:
-            return True
-elif platform.system() == "Linux":
-    def check_tcp_connection():
-        return g_client_socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO) == 1
-elif platform.system() == "Windows":
-    def check_tcp_connection():
-        raddr = g_client_socket.getpeername()
-        for conn in psutil.net_connections('tcp'):
-            if conn.raddr == raddr:
-                return conn.status == 'ESTABLISHED'
-        return False
-else:
-    raise RuntimeError("Unknown os")
+def check_tcp_connection():
+    g_tcp_handler.send_playing_heartbeat(finished=False)
 
 # io系列函数
 # now_played_cards: 用户已经输入好的字符串
@@ -125,8 +102,7 @@ if os.name == 'posix':
         check_tcp_counter = 0
         while select.select([sys.stdin], [], [], 0) == ([], [], []):
             if check_tcp_counter == 0:
-                if check_tcp_connection() is False:
-                    raise RuntimeError("Connection Failed")
+                check_tcp_connection()
                 check_tcp_counter = TCP_COUNTER
             check_tcp_counter -= 1
             time.sleep(0.05)
@@ -166,8 +142,7 @@ elif os.name == 'nt':
         check_tcp_counter = 0
         while not kbhit():
             if check_tcp_counter == 0:
-                if check_tcp_connection() is False:
-                    raise RuntimeError("Connection Failed")
+                check_tcp_connection()
                 check_tcp_counter = TCP_COUNTER
             check_tcp_counter -= 1
             time.sleep(0.05)
@@ -256,16 +231,16 @@ def read_userinput(client_cards):
 # last_player: 最后打出牌的玩家
 # client_player: 客户端正在输入的玩家
 # users_played_cards: 场上所有牌信息
-# client_socket: 客户端socket，用于检测远端是否关闭了
+# tcp_handler: 客户端句柄，用于检测远端是否关闭了
 def playing(
     client_cards,
     last_player: int,
     client_player: int,
     users_played_cards,
-    client_socket
+    tcp_handler
 ):
-    global g_client_socket
-    g_client_socket = client_socket
+    global g_tcp_handler
+    g_tcp_handler = tcp_handler
     print('请输入要出的手牌(\'F\'表示跳过):')
     global g_terminal_handler
     g_terminal_handler = TerminalHandler()
@@ -293,6 +268,7 @@ def playing(
         )
         if _if_input_legal:
             logger.info(f"now play: {new_played_cards}")
+            tcp_handler.send_playing_heartbeat(finished=True)
             break
         g_terminal_handler.err = '(非法牌型)'
         g_terminal_handler.print()

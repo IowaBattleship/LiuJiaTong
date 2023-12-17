@@ -66,6 +66,11 @@ class Game_Handler(BaseRequestHandler):
         user_played_cards = self.recv_data()
         now_score = self.recv_data()
         return user_cards, user_played_cards, now_score
+
+    def recv_playing_heartbeat(self):
+        finished = self.recv_data()
+        assert isinstance(finished, bool), finished
+        return finished
     
     def generate_cookie(self, length=8):
         # 可以使用的字符集合
@@ -116,7 +121,7 @@ class Game_Handler(BaseRequestHandler):
                 self.send_data(True)
                 self.is_recovery = True
                 self.is_player = True
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1m{self.pid} error recieving user info: {e}\x1b[0m")
             return False
         else:
@@ -144,9 +149,11 @@ class Game_Handler(BaseRequestHandler):
                     return True
                 else:
                     self.send_data(False)
-                    print(f"\x1b[33m\x1b[1m{self.pid} recover failed\x1b[0m")
-                    return False
-        except Exception as e:
+                    raise RuntimeError("user is playing")
+        except RuntimeError as e:
+            print(f"\x1b[33m\x1b[1m{self.pid} recover failed: {e}\x1b[0m")
+            return False
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1m{self.pid} error recovering: {e}\x1b[0m")
             return False
 

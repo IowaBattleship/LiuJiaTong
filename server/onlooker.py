@@ -1,4 +1,3 @@
-import os
 import logger
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
@@ -20,7 +19,7 @@ class Onlooker(GameStateMachine):
                     gvar.onlooker_number += 1
                     gvar.onlooker_lock.release()
                     break
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
             self.error = True
     def next_turn(self): 
@@ -28,7 +27,7 @@ class Onlooker(GameStateMachine):
     def send_field_info(self): 
         try:
             self.tcp_handler.send_field_info()
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
             self.error = True
     def send_round_info(self): 
@@ -37,7 +36,7 @@ class Onlooker(GameStateMachine):
         try:
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
-        except Exception as e:
+        except ConnectionResetError as e:
             print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
             self.error = True
     def recv_player_info(self): 

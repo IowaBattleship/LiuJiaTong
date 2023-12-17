@@ -7,9 +7,6 @@ utils.check_packages({
         ("win32api", "pypiwin32"),
         ("win32con", "pypiwin32"),
     ],
-    "default": [
-        ("psutil", None)
-    ]
 })
 import json
 import socket
@@ -213,12 +210,23 @@ class Client:
         self.send_data(self.users_played_cards[self.client_player])
         self.send_data(self.now_score)
 
+    def send_playing_heartbeat(self, finished: bool):
+        self.send_data(finished)
+
     def run(self):
-        if self.send_user_info() is False:
-            return
-        self.recv_field_info()
+        try:
+            if self.send_user_info() is False:
+                return
+            self.recv_field_info()
+        except ConnectionResetError as e:
+            print(f"\x1b[31m\x1b[1mConnection reset error when registering: {e}\x1b[0m")
+            os._exit(1)
         while True:
-            self.recv_round_info()
+            try:
+                self.recv_round_info()
+            except ConnectionResetError as e:
+                print(f"\x1b[31m\x1b[1mConnection reset error when getting round info: {e}\x1b[0m")
+                os._exit(1)
             # UI
             last_player = utils.last_played(self.users_played_cards, self.now_player)
             # 这里需要额外考虑一个情况就是当一个人打完所有牌，所有玩家无法跟时
@@ -249,15 +257,19 @@ class Client:
                 break
             # 轮到出牌
             if self.is_player and self.client_player == self.now_player:
-                new_played_cards, new_score = playing(self.client_cards, last_player, 
-                                self.client_player, self.users_played_cards, self.client)
-                new_played_cards.sort(key = utils.str_to_int)
-                self.users_played_cards[self.client_player] = new_played_cards
-                if new_played_cards != ['F']:
-                    for card in new_played_cards:
-                        self.client_cards.remove(card)
-                self.now_score += new_score
-                self.send_player_info()
+                try:
+                    new_played_cards, new_score = playing(self.client_cards, last_player, 
+                                self.client_player, self.users_played_cards, self)
+                    new_played_cards.sort(key = utils.str_to_int)
+                    self.users_played_cards[self.client_player] = new_played_cards
+                    if new_played_cards != ['F']:
+                        for card in new_played_cards:
+                            self.client_cards.remove(card)
+                    self.now_score += new_score
+                    self.send_player_info()
+                except ConnectionResetError as e:
+                    print(f"\x1b[31m\x1b[1mConnection reset error when playing: {e}\x1b[0m")
+                    os._exit(1)
 
 def ctrl_c_handler():
     print("Keyboard Interrupt")
