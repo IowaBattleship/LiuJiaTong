@@ -1,3 +1,4 @@
+import time
 import logger
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
@@ -7,24 +8,40 @@ class Player(GameStateMachine):
         raise RuntimeError("Unsupport state")
     def game_over(self): 
         if self.error:
-            user_cookie = None
             with gvar.users_info_lock:
                 gvar.users_error[self.client_player] = True
-                for cookie, client_player in gvar.users_cookie.items():
-                    if client_player == self.client_player:
-                        user_cookie = cookie
-            print(f"Player {self.pid}({self.client_player}) error exit -> {user_cookie}")
+            print(f"\x1b[33m\x1b[1mPlayer {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}\x1b[0m")
         else:
-            print(f"Player {self.pid}({self.client_player}) exit")
+            print(f"\x1b[32m\x1b[1mPlayer {self.pid}({self.client_player}) successful exit\x1b[0m")
         self.tcp_handler.close()
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
     def next_turn(self): 
         raise RuntimeError("Unsupport state")
+    def send_waiting_hall_info(self):
+        assert self.error is False
+        try:
+            users_num = 0
+            send_counter = 10
+            while True:                
+                with gvar.users_info_lock:
+                    new_users_num = self.tcp_handler.update_users_info()
+                send_counter -= 1
+                if new_users_num > users_num or send_counter == 0:
+                    self.tcp_handler.send_waiting_hall_info()
+                    users_num = new_users_num
+                    send_counter = 10
+                if users_num == 6:
+                    break
+                time.sleep(0.1)
+        except Exception as e:
+            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
+            self.error = True
     def send_field_info(self): 
+        assert self.error is False
         try:
             self.tcp_handler.send_field_info()
-        except ConnectionResetError as e:
+        except Exception as e:
             print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def send_round_info(self): 
@@ -32,7 +49,7 @@ class Player(GameStateMachine):
         try:
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
-        except ConnectionResetError as e:
+        except Exception as e:
             print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def recv_player_info(self): 
@@ -52,7 +69,7 @@ class Player(GameStateMachine):
                 gvar.users_played_cards[self.client_player] = user_played_cards
                 gvar.now_score = now_score
                 print(f'Player {self.pid}({self.client_player}) played cards:{gvar.users_played_cards[self.client_player]}')
-        except ConnectionResetError as e:
+        except Exception as e:
             print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
             self.error = True
     def init_sync(self): 
@@ -61,15 +78,6 @@ class Player(GameStateMachine):
         raise RuntimeError("Unsupport state")
     def game_start_sync(self): 
         gvar.game_start_barrier.wait()
-        # 这里放松了条件，因为在下一个同步点之前数据是只读的
-        assert self.tcp_handler.client_player == -1 and self.client_player == -1
-        with gvar.users_info_lock:
-            self.tcp_handler.client_player = self.client_player = \
-                next((i for i, (_, user_pid) in enumerate(gvar.users_info) if self.pid == user_pid), 0)
-            user_name, _ = gvar.users_info[self.client_player]
-            gvar.users_cookie[self.tcp_handler.user_cookie] = self.client_player
-            self.tcp_handler.users_name = [user_name for user_name, _ in gvar.users_info]
-        logger.info(f"{user_name}({self.pid}) -> client_player: {self.client_player}")
     def send_round_info_sync(self): 
         gvar.send_round_info_barrier.wait()
     def recv_player_info_sync(self): 
@@ -86,6 +94,8 @@ class Player(GameStateMachine):
         recovery = False
         def need_recovery():
             if self.state == GameState.init:
+                self.state = GameState.send_waiting_hall_info
+            elif self.state == GameState.send_waiting_hall_info:
                 self.state = GameState.send_field_info
             elif self.state == GameState.send_field_info:
                 self.state = GameState.send_round_info
@@ -96,9 +106,16 @@ class Player(GameStateMachine):
             if self.state == self.his_state:
                 self.his_state = None
             nonlocal recovery; recovery = True
-        
+        # 状态转移
         if self.state == GameState.init:
             if self.his_state is None:
+                self.state = GameState.send_waiting_hall_info
+            else:
+                need_recovery()
+        elif self.state == GameState.send_waiting_hall_info:
+            if self.error:
+                self.state = GameState.game_over
+            elif self.his_state is None:
                 self.state = GameState.init_sync
             else:
                 need_recovery()
@@ -164,6 +181,7 @@ class Player(GameStateMachine):
         self.his_state = his_state
         assert self.his_state in [
             None,
+            GameState.send_waiting_hall_info,
             GameState.send_field_info, 
             GameState.send_round_info,
             GameState.recv_player_info,

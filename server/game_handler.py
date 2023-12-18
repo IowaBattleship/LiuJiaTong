@@ -12,13 +12,13 @@ from socketserver import BaseRequestHandler
 class Game_Handler(BaseRequestHandler):
     def __init__(self, request, client_address, server):
         self.is_player = False
-        self.is_recovery = False
         self.serving_game_round = 0
-        self.client_player = -1
+        self.client_player = None
         self.user_cookie = None
         self.his_state = None
         self.pid = 0
         self.users_name = []
+        self.users_error = []
         
         super().__init__(request, client_address, server)
 
@@ -38,6 +38,18 @@ class Game_Handler(BaseRequestHandler):
 
     def close(self):
         self.request.close()
+
+    def update_users_info(self):
+        assert gvar.users_info_lock.locked()
+        self.users_name = []
+        self.users_error = []
+        for i in range(6):
+            if gvar.users_info[i] is None:
+                continue
+            user_name, _ = gvar.users_info[i]
+            self.users_name.append(user_name)
+            self.users_error.append(gvar.users_error[i])
+        return len(self.users_name)
 
     def send_field_info(self):
         # 玩家/旁观者
@@ -72,6 +84,10 @@ class Game_Handler(BaseRequestHandler):
         assert isinstance(finished, bool), finished
         return finished
     
+    def send_waiting_hall_info(self):
+        self.send_data(self.users_name)
+        self.send_data(self.users_error)
+    
     def generate_cookie(self, length=8):
         # 可以使用的字符集合
         characters = string.ascii_letters + string.digits
@@ -91,71 +107,51 @@ class Game_Handler(BaseRequestHandler):
             # cookie是否合法
             if self.client_player is None:
                 self.send_data(False)
-                self.is_recovery = False
                 # 不合法当做正常的玩家加入
-                user_idx = len(gvar.users_info)
+                user_idx = gvar.users_num
                 user_name = self.recv_data()
                 if user_idx == 6:
                     self.is_player = False
                     self.client_player = secrets.randbelow(6)
                     self.send_data(None)
                     print(f"\x1b[32m\x1b[1mOnlooker {user_name}({self.pid}) joined game -> player: {self.client_player}\x1b[0m")
-                    self.users_name = [user_name for user_name, _ in gvar.users_info]
                 else:
                     self.is_player = True
-                    self.client_player = -1
+                    self.client_player = gvar.users_player_id[user_idx]
                     # 生成cookie
                     self.user_cookie = self.generate_cookie()
                     while gvar.users_cookie.get(self.user_cookie) is not None:
                         self.user_cookie = self.generate_cookie()
                     self.send_data(self.user_cookie)
-                    print(f"\x1b[32m\x1b[1mPlayer {user_name}({self.pid}) joined game -> cookie: {self.user_cookie}\x1b[0m")
-                    logger.info(f"{user_name}({self.pid}) -> user_cookie: {self.user_cookie}")
+                    print(f"\x1b[32m\x1b[1mPlayer {user_name}({self.client_player}, {self.pid}) joined game -> cookie: {self.user_cookie}\x1b[0m")
+                    logger.info(f"{user_name}({self.client_player}, {self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
-                    assert self.client_player == -1
-                    gvar.users_info.append((user_name, self.pid))
+                    gvar.users_num += 1
+                    gvar.users_info[self.client_player] = (user_name, self.pid)
+                    assert 0 <= self.client_player and self.client_player < 6, self.client_player
                     gvar.users_cookie[self.user_cookie] = self.client_player
             else:
-                # 合法就先发送标识，之后考虑恢复的情况
+                # 发送合法标识，并尝试恢复
                 self.send_data(True)
-                self.is_recovery = True
                 self.is_player = True
-        except ConnectionResetError as e:
-            print(f"\x1b[31m\x1b[1m{self.pid} error recieving user info: {e}\x1b[0m")
-            return False
-        else:
-            return True
-    
-    def try_recovery(self):
-        # 因为只有游戏开始之后才知道自己的player标识
-        # 如果拿到cookie成功匹配之后发现值是-1就意味着游戏还没开始，只能硬等
-        while self.client_player == -1:
-            time.sleep(0.5)
-            with gvar.users_info_lock:
-                self.client_player = gvar.users_cookie[self.user_cookie]
-        # 需要判断是否能够实现正确恢复,最多只有一个线程能够恢复
-        print(f"{self.pid}: valid cookie {self.user_cookie} -> player {self.client_player}")
-        try:
-            with gvar.users_info_lock:
+                assert 0 <= self.client_player and self.client_player < 6, self.client_player
                 if gvar.users_error[self.client_player]:
                     self.send_data(True)
+                    # 修改是放在最后的，防止中间出现任何的网络通信失败
                     self.his_state = gvar.users_his_state[self.client_player]
                     gvar.users_error[self.client_player] = False
                     user_name, old_pid = gvar.users_info[self.client_player]
                     gvar.users_info[self.client_player] = (user_name, self.pid)
                     print(f"\x1b[32m\x1b[1m{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}\x1b[0m")
-                    self.users_name = [user_name for user_name, _ in gvar.users_info]
-                    return True
                 else:
                     self.send_data(False)
-                    raise RuntimeError("user is playing")
-        except RuntimeError as e:
-            print(f"\x1b[33m\x1b[1m{self.pid} recover failed: {e}\x1b[0m")
+                    raise RuntimeError("recover failed because user is playing")
+        except Exception as e:
+            print(f"\x1b[31m\x1b[1m{self.pid} error recieving user info: {e}\x1b[0m")
             return False
-        except ConnectionResetError as e:
-            print(f"\x1b[31m\x1b[1m{self.pid} error recovering: {e}\x1b[0m")
-            return False
+        else:
+            return True
 
     def handle(self):        
         with gvar.users_info_lock:
@@ -164,25 +160,18 @@ class Game_Handler(BaseRequestHandler):
             self.serving_game_round = gvar.serving_game_round
             if self.recv_user_info() is False:
                 return
-        # 尝试恢复            
-        if self.is_recovery:
-            if self.try_recovery() is False:
-                return
-        
         if self.is_player:
-            player = Player(
+            Player(
                 self.client_player,
                 self.his_state,
                 self,
-            )
-            player.run()
+            ).run()
         else:
-            onlooker = Onlooker(
+            Onlooker(
                 self.client_player,
                 self.serving_game_round,
                 self,
-            )
-            onlooker.run()
+            ).run()
 
 
         

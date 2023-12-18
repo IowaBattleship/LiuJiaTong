@@ -13,8 +13,9 @@ import socket
 import struct
 import time
 import argparse
-from interface import main_interface, game_over_interface
+from interface import main_interface, game_over_interface, waiting_hall_interface
 from playing_handler import playing
+from terminal_printer import TerminalHandler
 import logger
 
 CONFIG_NAME = 'LiuJiaTong.json'
@@ -181,6 +182,17 @@ class Client:
             logger.info(f"cookie invalid, new cookie {self.config.cookie}")
         return True
     
+    # 接收等待大厅信息
+    def recv_waiting_hall_info(self):
+        th = TerminalHandler()
+        while True:
+            self.users_name = self.recv_data()
+            # 收集用户在线/离线信息
+            users_error = self.recv_data()
+            waiting_hall_interface(th, self.users_name, users_error)
+            if len(self.users_name) == 6:
+                break
+
     # 接收用户信息
     def recv_field_info(self):
         self.is_player = self.recv_data()
@@ -217,14 +229,16 @@ class Client:
         try:
             if self.send_user_info() is False:
                 return
+            self.recv_waiting_hall_info()
             self.recv_field_info()
-        except ConnectionResetError as e:
+            print("游戏开始，你是一名(" + "玩家" if self.is_player else f"旁观者({self.users_name[self.client_player]})" +")")
+        except Exception as e:
             print(f"\x1b[31m\x1b[1mConnection reset error when registering: {e}\x1b[0m")
             os._exit(1)
         while True:
             try:
                 self.recv_round_info()
-            except ConnectionResetError as e:
+            except Exception as e:
                 print(f"\x1b[31m\x1b[1mConnection reset error when getting round info: {e}\x1b[0m")
                 os._exit(1)
             # UI
@@ -267,7 +281,7 @@ class Client:
                             self.client_cards.remove(card)
                     self.now_score += new_score
                     self.send_player_info()
-                except ConnectionResetError as e:
+                except Exception as e:
                     print(f"\x1b[31m\x1b[1mConnection reset error when playing: {e}\x1b[0m")
                     os._exit(1)
 

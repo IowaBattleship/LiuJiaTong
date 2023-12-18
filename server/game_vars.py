@@ -1,3 +1,4 @@
+import random
 import threading
 from state_machine import GameState
 class Game_Var:
@@ -16,12 +17,16 @@ class Game_Var:
         self.team_out = [0, 0]  # 各队逃出人数
         self.game_over = 0 # 游戏结束状态
     
-    def init_global_env(self):
+    def init_global_env(self, static_user_order: bool = False):
         assert self.users_info_lock.locked()
         assert self.onlooker_lock.locked()
         self.serving_game_round += 1
-        self.users_info = []
+        self.users_info = [None for _ in range(6)]
         self.users_cookie = {}
+        self.users_num = 0
+        self.users_player_id = [i for i in range(6)]
+        if static_user_order is False:
+            random.shuffle(self.users_player_id)
         self.users_his_state = [GameState.init for _ in range(6)]
         self.users_error = [False for _ in range(6)]
     
@@ -29,8 +34,10 @@ class Game_Var:
         # 用户登录
         self.users_info_lock = threading.Lock()
         self.serving_game_round = 0
-        self.users_info = []
+        self.users_info = [None for _ in range(6)]
         self.users_cookie = {}
+        self.users_num = 0
+        self.users_player_id = [0 for _ in range(6)]
         self.users_his_state = [GameState.init for _ in range(6)] # 用户记录的历史状态
         self.users_error = [False for _ in range(6)] # 用户是否发生异常
         # 牌局变量
@@ -47,7 +54,8 @@ class Game_Var:
         self.onlooker_lock = threading.Lock()
         self.onlooker_local_lock = threading.Lock()
         self.onlooker_number = 0
-        self.onlooker_barrier = threading.Barrier(1)
+        self.onlooker_onlooker_sync_barrier = threading.Barrier(1)
+        self.onlooker_send_round_info_barrier = threading.Barrier(1)
         self.onlooker_event = threading.Event()
 
 gvar = Game_Var()

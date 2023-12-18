@@ -14,9 +14,12 @@ from manager import Manager
 import logger
 import threading
 import argparse
+import threading
 
+manager_barrier = threading.Barrier(2)
 def manager_thread(static_user_order):
     manager = Manager(static_user_order)
+    manager_barrier.wait()
     manager.run()
 
 ctrl_c_handler_lock = threading.Lock()
@@ -40,6 +43,7 @@ if __name__ == '__main__':
         utils.register_signal_handler(ctrl_c_handler)
         server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
         threading.Thread(target=manager_thread,args=(args.static,)).start()
+        manager_barrier.wait()
     except Exception as e:
         print(f"\x1b[31m\x1b[1mserver error: {e}\x1b[0m")
         os._exit(1)

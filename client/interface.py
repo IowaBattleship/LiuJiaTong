@@ -1,143 +1,56 @@
-import os
 from sound import playsound, playsounds
 from playingrules import judge_and_transform_cards, CardType
-from typing import List
+from terminal_printer import *
 
-import utils
+def gen_paragraph(string: str) -> Paragraph:
+    sentence = Sentence()
+    sentence.string = string
+    return [sentence]
 
-class Sentence:
-    """
-    打印的切片数据
-    :string : 打印的字符串（不带控制序列字符）
-    :highlight : 是否要高亮版的字符串
-    :color : 如果color为0则打印白色字符，否则打印对应的颜色的字符，控制序列格式串为f'\\x1b[{color}m'
-    :blink : 是否需要闪烁字符串
-    :underline : 是否需要对字符串添加下划线
-    """
-    def __init__(self):
-        self.string: str = ""
-        self.highlight: bool = False
-        self.color: int = 0
-        self.blink: bool = False
-        self.underline: bool = False
+def gen_waiting_hall_header_chapter() -> Chapter:
+    chapter = [
+        gen_paragraph("等待大厅"),
+    ]
+    return chapter
 
-    def __str__(self):
-        return self.string
-    
-    def columns(self) -> int:
-        return utils.columns(self.string)
-    
-    def gen_print(self) -> str:
-        print_str = ""
-        # 打印控制序列字符
-        if self.highlight:
-            print_str += '\x1b[1m'
-        if self.color > 0:
-            print_str += f'\x1b[{self.color}m'
-        if self.blink:
-            print_str += '\x1b[5m'
-        if self.underline:
-            print_str += '\x1b[4m'
-        # 打印字符串
-        print_str += self.string
-        # 清除格式
-        print_str += '\x1b[0m'
-        return print_str
-    def gen_csi(self) -> str:
-        print_str = ""
-        if self.highlight:
-            print_str += '\x1b[1m'
-        if self.color > 0:
-            print_str += f'\x1b[{self.color}m'
-        if self.blink:
-            print_str += '\x1b[5m'
-        if self.underline:
-            print_str += '\x1b[4m'
-        return print_str
-
-Paragraph = List[Sentence]
-Chapter = List[Paragraph]
-Article = List[Chapter]
-
-def clear_screen():
-    print('\x1b[2J\x1b[H', end='')
-
-def print_hline(term_column: int):
-    assert term_column >= 2, term_column
-    print('+', '-' * (term_column - 2), '+', sep='')
-
-def paragraph_columns(paragraph: Paragraph) -> int:
-    assert(len(paragraph) > 0)
-    columns = len(paragraph) - 1 #中间用空格隔开
-    for sentence in paragraph:
-        columns += sentence.columns()
-    return columns
-
-def print_paragraph(paragraph: Paragraph, term_column: int):
-    assert(len(paragraph) > 0)
-    assert(term_column >= 4)
-    line_begin = False
-    line_end = False
-    now_column = 0 
-    max_column = term_column - 2 
-    for sentence in paragraph:
-        printed = False
-        while not printed:
-            if not line_begin:
-                print('|', end='')
-                line_begin = True
-                line_end = False
-            else:
-                if now_column < max_column:
-                    print(' ', end='')
-                    now_column += 1
-                else:
-                    print('|\n|',end='')
-                    now_column = 0
-            
-            if now_column + sentence.columns() > max_column:
-                if now_column > 0:
-                    print(' ' * (max_column - now_column), '|', sep='')
-                    assert(not line_end)
-                    line_begin = False
-                    line_end = True
-                    now_column = 0
-                else:
-                    csi_flag = False
-                    for ch in sentence.gen_print():
-                        if ch == '\x1b':
-                            csi_flag = True
-                        if csi_flag:
-                            print(ch, end='')
-                            if 'A' <= ch <= 'Z' or 'a' <= ch <= 'z': #这里简单判了，不是很标准
-                                csi_flag = False
-                            continue
-                        if now_column + utils.columns(ch) > max_column:
-                            print(' ' * (max_column - now_column), '\x1b[0m', '|', sep='')
-                            print('|', sentence.gen_csi(), ch, sep='', end='')
-                            now_column = utils.columns(ch)
-                        else:
-                            print(ch, end='')
-                            now_column += utils.columns(ch)
-                    printed = True
-            else:
-                print(sentence.gen_print(), end='')
-                now_column += sentence.columns()    
-                printed = True        
-    if not line_end:
-        print(' ' * (max_column - now_column), '|', sep='')
-
-def gen_help_chapter() -> Chapter:
+def gen_waiting_hall_users_chapter(users_name, users_error) -> Chapter:
     chapter = []
     
-    def gen_paragraph(string: str) -> Paragraph:
-        sentence = Sentence()
-        sentence.string = string
-        return [sentence]
-    chapter.append(gen_paragraph("B 代表 10"))
-    chapter.append(gen_paragraph("0 代表 小王  1 代表 大王"))
-    chapter.append(gen_paragraph("tab键 补全牌  C键 清空手中的牌"))
+    for i in range(len(users_name)):
+        paragraph = []
 
+        user_name = Sentence()
+        user_name.string = users_name[i]
+        paragraph.append(user_name)
+
+        user_error = Sentence()
+        user_error.string = "离线" if users_error[i] else "在线"
+        user_error.highlight = True
+        user_error.color = 31 if users_error[i] else 32
+        paragraph.append(user_error)
+
+        chapter.append(paragraph)
+
+    return chapter
+
+def waiting_hall_interface(th: TerminalHandler, users_name, users_error):
+    header_chapter = gen_waiting_hall_header_chapter()
+    users_chapter = gen_waiting_hall_users_chapter(users_name, users_error)
+    
+    article = [
+        header_chapter,
+        users_chapter,
+    ]
+    th.reset_cursor()
+    th.update_max_column(article_columns(article))
+    print_article(article, th)
+
+def gen_help_chapter() -> Chapter:
+    chapter = [
+        gen_paragraph("B 代表 10"),
+        gen_paragraph("0 代表 小王  1 代表 大王"),
+        gen_paragraph("tab键 补全牌  C键 清空手中的牌"),
+    ]
     return chapter
 
 def gen_score_chapter(
@@ -240,24 +153,13 @@ def gen_player_field_paragraph(
     return paragraph
 
 def gen_player_cards_paragraph(user_cards) -> Paragraph:
-    paragraph = []
-
-    player_cards = Sentence()
-    player_cards.string += gen_cards_string(user_cards)
-    paragraph.append(player_cards)
-
-    return paragraph
+    return gen_paragraph(gen_cards_string(user_cards))
 
 def gen_cards_chapter(is_player, client_cards) -> Chapter:
-    chapter = []
-
-    def gen_paragraph(string: str) -> Paragraph:
-        sentence = Sentence()
-        sentence.string = string
-        return [sentence]
-    chapter.append(gen_paragraph("你的手牌" + ("(旁观)" if not is_player else "") + ":"))
-    chapter.append(gen_paragraph(gen_cards_string(client_cards)))
-
+    chapter = [
+        gen_paragraph("你的手牌" + ("(旁观)" if not is_player else "") + ":"),
+        gen_paragraph(gen_cards_string(client_cards))
+    ]
     return chapter
 
 def main_interface(
@@ -281,14 +183,13 @@ def main_interface(
     his_now_score, 
     his_last_player,
 ):
-    clear_screen()
     # 输出帮助
     help_chapter = gen_help_chapter()
     # 输出得分
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
     name_maxlen = 8
     for i in range(6):
-        name_maxlen = max(name_maxlen, utils.columns(users_name[i]))
+        name_maxlen = max(name_maxlen, columns(users_name[i]))
     # 输出其它玩家
     other_player_chapter = []
     client_player_chapter = []
@@ -333,20 +234,12 @@ def main_interface(
         client_player_chapter,
         cards_chapter,
     ]
-    # 统计最终的终端列数
-    term_column = 0
-    for chapter in article:
-        for paragraph in chapter:
-            term_column = max(term_column, paragraph_columns(paragraph))
-    term_column += 2
-    term_column = min(term_column, os.get_terminal_size().columns - 1)
-
     # 最后的输出
-    for chapter in article:
-        print_hline(term_column)
-        for paragraph in chapter:
-            print_paragraph(paragraph, term_column)
-    print_hline(term_column)
+    th = TerminalHandler()
+    th.update_max_column(article_columns(article))
+    th.clear_screen_all()
+    th.move_cursor()
+    print_article(article, th)
 
     # 根据手牌判断播放的音效
     if not is_start:
@@ -379,14 +272,14 @@ def main_interface(
                 playsound("throw1", True, None)
 
 
-def game_over_interface(client_player, _if_game_over):
+def game_over_interface(client_player, if_game_over):
     print('\n')
-    if client_player % 2 + 1 == (_if_game_over + 2) % 2:
+    if client_player % 2 + 1 == (if_game_over + 2) % 2:
         print('游戏结束，你的队伍获得了胜利', end='')
-        if _if_game_over < 0:
+        if if_game_over < 0:
             print('，并成功双统')
     else:
         print('游戏结束，你的队伍未能取得胜利', end='')
-        if _if_game_over < 0:
+        if if_game_over < 0:
             print('，并被对方双统')
     playsound("clap", False, None)

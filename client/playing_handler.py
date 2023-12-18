@@ -7,70 +7,7 @@ import logger
 from enum import Enum
 import utils
 from playingrules import if_input_legal
-
-class TerminalHandler:
-    def __init__(self):
-        # 终端信息
-        self.column_max = os.get_terminal_size().columns - 1
-        assert self.column_max >= 2, self.column_max
-        self.row = self.column = 0
-        self.row_buffer = ""
-        # 用户打牌信息
-        self.new_played_cards = []
-        self.cursor = 0
-        self.err = ""
-    
-    def __reset_cursor(self):
-        if self.row > 0:
-            print(f"\x1b[{self.row}A", end='')
-            self.row = 0
-        if self.column > 0:
-            print(f"\x1b[{self.column}D", end='')
-            self.column = 0
-
-    def __flush_buffer(self, end):
-        assert end in ['\n', ''], end
-        print(self.row_buffer, end=end)
-        if end == '\n':
-            self.row += 1
-            self.column = 0
-        self.row_buffer = ""
-
-    def __print_string(self, string:str, end='\n'):
-        assert self.row_buffer == "", self.row_buffer
-        assert end in ['\n', ''], end
-        for ch in string:
-            ch_columns = utils.columns(ch)
-            if self.column + ch_columns > self.column_max:
-                self.__flush_buffer(end='\n')
-            self.row_buffer += ch
-            self.column += ch_columns
-        if end == '\n':
-            if self.row_buffer != "":
-                self.__flush_buffer(end='\n')
-        elif end == '':
-            if self.column == self.column_max:
-                self.__flush_buffer(end='\n')
-            else:
-                self.__flush_buffer(end='')
-        else:
-            raise RuntimeError("")
-
-    def print(self):
-        # 恢复光标并清理所有的下面的屏幕数据
-        self.__reset_cursor()
-        print("\x1b[J", end='')
-        sys.stdout.flush()
-        # 打印信息
-        self.__print_string("".join(self.new_played_cards))
-        self.__print_string(self.err, end='')
-        # 恢复光标
-        self.__reset_cursor()
-        # 再输出一遍直到cursor位置
-        self.__print_string("".join(self.new_played_cards[0:self.cursor]), end='')
-        # 最后刷新print的缓冲区
-        sys.stdout.flush()
-    
+from terminal_printer import *
 class SpecialInput(Enum):
     left_arrow = 0
     right_arrow = 1
@@ -82,11 +19,30 @@ class InputException(Exception):
     def __str__(self):
         return repr(self.value)
 
-g_terminal_handler = TerminalHandler()
-g_tcp_handler = None
+class PlayingTerminalHandler(TerminalHandler):
+    def __init__(self):
+        super().__init__()
+        # 用户打牌信息
+        self.new_played_cards = []
+        self.cursor = 0
+        self.err = ""
+    
+    def print(self):
+        # 恢复光标并清理所有的下面的屏幕数据
+        self.reset_cursor()
+        self.clear_screen_after_cursor()
+        # 打印信息
+        self.print_string("".join(self.new_played_cards), new_line=True)
+        self.print_string(self.err, new_line=False)
+        # 恢复光标
+        self.reset_cursor()
+        # 再输出一遍直到cursor位置
+        self.print_string("".join(self.new_played_cards[0:self.cursor]), new_line=False)
+        # 最后刷新print的缓冲区
+        self.flush()
 
-def check_tcp_connection():
-    g_tcp_handler.send_playing_heartbeat(finished=False)
+g_terminal_handler = None
+g_tcp_handler = None
 
 # io系列函数
 # now_played_cards: 用户已经输入好的字符串
@@ -102,7 +58,7 @@ if os.name == 'posix':
         check_tcp_counter = 0
         while select.select([sys.stdin], [], [], 0) == ([], [], []):
             if check_tcp_counter == 0:
-                check_tcp_connection()
+                g_tcp_handler.send_playing_heartbeat(finished=False)
                 check_tcp_counter = TCP_COUNTER
             check_tcp_counter -= 1
             time.sleep(0.05)
@@ -142,7 +98,7 @@ elif os.name == 'nt':
         check_tcp_counter = 0
         while not kbhit():
             if check_tcp_counter == 0:
-                check_tcp_connection()
+                g_tcp_handler.send_playing_heartbeat(finished=False)
                 check_tcp_counter = TCP_COUNTER
             check_tcp_counter -= 1
             time.sleep(0.05)
@@ -243,7 +199,7 @@ def playing(
     g_tcp_handler = tcp_handler
     print('请输入要出的手牌(\'F\'表示跳过):')
     global g_terminal_handler
-    g_terminal_handler = TerminalHandler()
+    g_terminal_handler = PlayingTerminalHandler()
 
     new_played_cards = []
     new_score = 0

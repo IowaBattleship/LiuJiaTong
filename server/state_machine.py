@@ -18,6 +18,7 @@ class GameState(Enum):
     onlooker_register = auto(),
     next_turn = auto(),
     # socket
+    send_waiting_hall_info = auto(),
     send_field_info = auto(),
     send_round_info = auto(),
     recv_player_info = auto(),
@@ -42,6 +43,9 @@ class GameStateMachine(ABC):
         pass
     @abstractmethod
     def next_turn(self): 
+        pass
+    @abstractmethod
+    def send_waiting_hall_info(self):
         pass
     @abstractmethod
     def send_field_info(self): 
@@ -78,6 +82,7 @@ class GameStateMachine(ABC):
             GameState.game_over: self.game_over,
             GameState.onlooker_register: self.onlooker_register,
             GameState.next_turn: self.next_turn,
+            GameState.send_waiting_hall_info: self.send_waiting_hall_info,
             GameState.send_field_info: self.send_field_info,
             GameState.send_round_info: self.send_round_info,
             GameState.recv_player_info: self.recv_player_info,

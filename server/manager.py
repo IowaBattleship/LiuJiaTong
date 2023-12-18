@@ -111,32 +111,34 @@ class Manager(GameStateMachine):
     def game_start(self): 
         with gvar.users_info_lock:
             logger.info(f"Manager: New game --- Round {gvar.serving_game_round}")
-            if self.static_user_order:
-                pass
-            else:
-                # 随机出牌顺序
-                random.shuffle(gvar.users_info)
         with gvar.game_lock:
             gvar.init_game_env()
             init_cards()  # 初始化牌并发牌
     def game_over(self): 
         with gvar.users_info_lock:
-            gvar.init_global_env()
+            gvar.init_global_env(self.static_user_order)
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
     def next_turn(self): 
         with gvar.game_lock:
             get_next_turn()
+    def send_waiting_hall_info(self):
+        raise RuntimeError("Unsupport state")
     def send_field_info(self): 
         raise RuntimeError("Unsupport state")
     def send_round_info(self): 
         # 会在send_round_info_sync处放掉
         gvar.onlooker_lock.acquire()
         # barrier要考虑自己
-        gvar.onlooker_barrier = threading.Barrier(gvar.onlooker_number + 1)
+        gvar.onlooker_onlooker_sync_barrier = threading.Barrier(gvar.onlooker_number + 1)
+        gvar.onlooker_send_round_info_barrier = threading.Barrier(gvar.onlooker_number + 1)
         gvar.onlooker_event.set()
+        # 这里先wait等待所有的旁观者线程和manager线程都确认可以发送了
+        gvar.onlooker_onlooker_sync_barrier.wait()
+        # 然后再将其清理掉，否则万一先clear了，还没闯进来的旁观者线程就阻塞了，manager线程也寄了
         gvar.onlooker_event.clear()
-        gvar.onlooker_barrier.wait()
+        # 最后等待所有的旁观者线程发送完信息
+        gvar.onlooker_send_round_info_barrier.wait()
     def recv_player_info(self): 
         raise RuntimeError("Unsupport state")
     def init_sync(self): 
@@ -199,11 +201,10 @@ class Manager(GameStateMachine):
 
     def __init__(self, static_user_order):
         super().__init__()
-
+        self.static_user_order = static_user_order
         # 在游戏还没开始前由manager将其锁住
         gvar.onlooker_lock.acquire()
         with gvar.users_info_lock:
-            gvar.init_global_env()
+            gvar.init_global_env(self.static_user_order)
         with gvar.game_lock:
             self.__game_over = gvar.game_over
-        self.static_user_order = static_user_order
