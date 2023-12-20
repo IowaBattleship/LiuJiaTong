@@ -38,14 +38,13 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--static', action='store_true', default=False, help='disable reorder users')
     args = parser.parse_args()
 
+    logger.init_logger()
+    utils.register_signal_handler(ctrl_c_handler)
+    threading.Thread(target=manager_thread,args=(args.static,)).start()
     try:
-        logger.init_logger()
-        utils.register_signal_handler(ctrl_c_handler)
         server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
-        threading.Thread(target=manager_thread,args=(args.static,)).start()
         manager_barrier.wait()
+        print("Listening")
+        server.serve_forever()
     except Exception as e:
-        print(f"\x1b[31m\x1b[1mserver error: {e}\x1b[0m")
-        os._exit(1)
-    print("Listening")
-    server.serve_forever()
+        utils.fatal(f"server error: {e}")

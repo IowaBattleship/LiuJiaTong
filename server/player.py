@@ -1,18 +1,24 @@
 import time
+import utils
 import logger
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
 
 class Player(GameStateMachine):
+    # 私有方法
+    def __handle_error(self, e):
+        utils.error(f"Player {self.pid}({self.client_player}, {self.state}) error: {e}")
+        self.error = True
+    # 抽象类方法
     def game_start(self): 
         raise RuntimeError("Unsupport state")
     def game_over(self): 
         if self.error:
             with gvar.users_info_lock:
                 gvar.users_error[self.client_player] = True
-            print(f"\x1b[33m\x1b[1mPlayer {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}\x1b[0m")
+            utils.warn(f"Player {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}")
         else:
-            print(f"\x1b[32m\x1b[1mPlayer {self.pid}({self.client_player}) successful exit\x1b[0m")
+            utils.success(f"Player {self.pid}({self.client_player}) exit successfully")
         self.tcp_handler.close()
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
@@ -35,23 +41,20 @@ class Player(GameStateMachine):
                     break
                 time.sleep(0.1)
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def send_field_info(self): 
         assert self.error is False
         try:
             self.tcp_handler.send_field_info()
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def send_round_info(self): 
         assert self.error is False
         try:
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def recv_player_info(self): 
         assert self.error is False
         try:
@@ -70,8 +73,7 @@ class Player(GameStateMachine):
                 gvar.now_score = now_score
                 print(f'Player {self.pid}({self.client_player}) played cards:{gvar.users_played_cards[self.client_player]}')
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mPlayer {self.pid}({self.client_player}, {self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def init_sync(self): 
         gvar.game_init_barrier.wait()
     def onlooker_sync(self): 

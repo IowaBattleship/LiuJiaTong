@@ -1,6 +1,7 @@
 from sound import playsound, playsounds
 from playingrules import judge_and_transform_cards, CardType
 from terminal_printer import *
+import utils
 
 def gen_paragraph(string: str) -> Paragraph:
     sentence = Sentence()

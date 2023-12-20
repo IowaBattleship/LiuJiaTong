@@ -1,8 +1,14 @@
 import logger
+import utils
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
 
 class Onlooker(GameStateMachine):
+    # 私有方法
+    def __handle_error(self, e):
+        utils.error(f"Onlooker {self.pid}({self.state}) error: {e}")
+        self.error = True
+    # 抽象类方法
     def game_start(self): 
         raise RuntimeError("Unsupport state")
     def game_over(self): 
@@ -21,8 +27,7 @@ class Onlooker(GameStateMachine):
                     gvar.onlooker_lock.release()
                     break
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def next_turn(self): 
         raise RuntimeError("Unsupport state")
     def send_waiting_hall_info(self):
@@ -36,15 +41,13 @@ class Onlooker(GameStateMachine):
                     break
                 raise RuntimeError("Why there are less than 6 player but you are onlooker???")
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def send_field_info(self): 
         assert self.error is False
         try:
             self.tcp_handler.send_field_info()
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def send_round_info(self): 
         if self.error:
             return
@@ -52,8 +55,7 @@ class Onlooker(GameStateMachine):
             with gvar.game_lock:
                 self.tcp_handler.send_round_info()
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mOnlooker {self.pid}({self.state}) error: {e}\x1b[0m")
-            self.error = True
+            self.__handle_error(e)
     def recv_player_info(self): 
         raise RuntimeError("Unsupport state")
     def init_sync(self): 

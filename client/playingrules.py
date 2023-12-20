@@ -1,7 +1,6 @@
 import copy
 from collections import Counter
 from enum import Enum
-import utils
 
 '''
 3 ~ 15 -> 3 ~ 10 + J Q K A 2

@@ -1,17 +1,16 @@
-import utils
 import os
 import sys
 import time
 import select
 import logger
-from enum import Enum
 import utils
+from enum import Enum, auto
 from playingrules import if_input_legal
 from terminal_printer import *
 class SpecialInput(Enum):
-    left_arrow = 0
-    right_arrow = 1
-    backspace = 2
+    left_arrow = auto(),
+    right_arrow = auto(),
+    backspace = auto(),
 
 class InputException(Exception):
     def __init__(self, value):
@@ -44,6 +43,16 @@ class PlayingTerminalHandler(TerminalHandler):
 g_terminal_handler = None
 g_tcp_handler = None
 
+def wait_for_input(check_have_input):
+    TCP_COUNTER = 20
+    check_tcp_counter = 0
+    while check_have_input() is False:
+        if check_tcp_counter == 0:
+            g_tcp_handler.send_playing_heartbeat(finished=False)
+            check_tcp_counter = TCP_COUNTER
+        check_tcp_counter -= 1
+        time.sleep(0.05)
+
 # io系列函数
 # now_played_cards: 用户已经输入好的字符串
 # cursor: 光标位置
@@ -54,14 +63,9 @@ if os.name == 'posix':
     def read_byte(if_remaining: bool) -> str:
         if if_remaining:
             return sys.stdin.read(1)
-        TCP_COUNTER = 20
-        check_tcp_counter = 0
-        while select.select([sys.stdin], [], [], 0) == ([], [], []):
-            if check_tcp_counter == 0:
-                g_tcp_handler.send_playing_heartbeat(finished=False)
-                check_tcp_counter = TCP_COUNTER
-            check_tcp_counter -= 1
-            time.sleep(0.05)
+        def check_have_input() -> bool:
+            return select.select([sys.stdin], [], [], 0) != ([], [], [])
+        wait_for_input(check_have_input)
         return sys.stdin.read(1)
 
     def read_direction():
@@ -94,14 +98,9 @@ elif os.name == 'nt':
     # windows
     from msvcrt import getch, kbhit
     def read_byte() -> str:
-        TCP_COUNTER = 20
-        check_tcp_counter = 0
-        while not kbhit():
-            if check_tcp_counter == 0:
-                g_tcp_handler.send_playing_heartbeat(finished=False)
-                check_tcp_counter = TCP_COUNTER
-            check_tcp_counter -= 1
-            time.sleep(0.05)
+        def check_have_input():
+            return kbhit()
+        wait_for_input(check_have_input)
         return chr(getch()[0])
         
     def read_direction():
@@ -238,5 +237,3 @@ def playing(
         raise RuntimeError('unknow os!') 
     
     return new_played_cards, new_score
-    
-    

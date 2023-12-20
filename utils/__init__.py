@@ -58,6 +58,22 @@ def last_played(played_cards, player):
         i = (i - 1 + 6) % 6
     return player
 
+def verbose(string: str):
+    print(f"\x1b[30m\x1b[1m{string}\x1b[0m")
+
+def success(string: str):
+    print(f"\x1b[32m\x1b[1m{string}\x1b[0m")
+
+def warn(string: str):
+    print(f"\x1b[33m\x1b[1m{string}\x1b[0m")
+
+def error(string: str):
+    print(f"\x1b[31m\x1b[1m{string}\x1b[0m")
+
+def fatal(string: str):
+    error(string)
+    os._exit(1)
+
 def user_confirm(prompt: str, default: bool):
     while True:
         print(prompt, end='')
@@ -97,8 +113,8 @@ def check_packages(packages: dict):
     for package_info in packages.get("default", []):
         __try_to_import(package_info)
     if if_need_restart:
-        print("\x1b[32m\x1b[1mPackages are installed, please restart program to update system enviroment\x1b[0m")
-        os._exit(0)
+        success("Packages are installed, please restart program to update system enviroment")
+        exit(0)
 
 def register_signal_handler(ctrl_c_handler):
     if os.name == "posix":

@@ -124,19 +124,18 @@ class Client:
         try_times = 0
         while if_connected is False and try_times < 10:
             try:
-                print("Try to connect with server...")
+                print("尝试与服务器连接...")
                 try_times += 1
                 self.client.connect((server_ip, server_port))
             except Exception as e:
-                print(e)
+                utils.error(f"连接错误: {e}")
                 time.sleep(1)
             else:
                 if_connected = True
         if if_connected:
-            print("\x1b[32m\x1b[1mConnect succeeded\x1b[0m")
+            utils.success("连接成功")
         else:
-            print("\x1b[31m\x1b[1mConnect failed\x1b[0m")
-        return if_connected
+            utils.fatal("连接失败")
 
     def close(self):
         self.client.close()
@@ -155,7 +154,7 @@ class Client:
         data = json.loads(data.decode())
         return data
 
-    def send_user_info(self) -> bool:
+    def send_user_info(self):
         # 发送本地的cookie信息
         logger.info(f"Client coockie {self.config.cookie}")
         if self.no_cookie:
@@ -170,17 +169,14 @@ class Client:
         # 重发cookie的同时还得同步用户名
         if_valid_cookie = self.recv_data()
         if if_valid_cookie:
-            print("Start recovering")
+            print("cookie合法，开始恢复")
             if_recovery = self.recv_data()
             if if_recovery is False:
-                print("\x1b[31m\x1b[1mRecovery failed, may someone are running this yet?\x1b[0m")
-                return False
+                raise RuntimeError("恢复失败，是不是有客户端还在运行？")
         else:
-            print("Start game")
             self.send_data(self.config.name)
             self.config.update_cookie(self.recv_data())
             logger.info(f"cookie invalid, new cookie {self.config.cookie}")
-        return True
     
     # 接收等待大厅信息
     def recv_waiting_hall_info(self):
@@ -225,22 +221,22 @@ class Client:
     def send_playing_heartbeat(self, finished: bool):
         self.send_data(finished)
 
-    def run(self):
+    def handle_connection_error(self, func, msg):
         try:
-            if self.send_user_info() is False:
-                return
-            self.recv_waiting_hall_info()
-            self.recv_field_info()
-            print("游戏开始，你是一名(" + "玩家" if self.is_player else f"旁观者({self.users_name[self.client_player]})" +")")
+            ret = func()
+            return ret
         except Exception as e:
-            print(f"\x1b[31m\x1b[1mConnection reset error when registering: {e}\x1b[0m")
-            os._exit(1)
+            self.close()
+            utils.error(f"{msg}: {e}")
+            exit(1)
+
+    def run(self):
+        self.handle_connection_error(self.send_user_info, "在注册时与服务器的链接失效")
+        self.handle_connection_error(self.recv_waiting_hall_info, "在游戏时与服务器链接失效(等待大厅)")
+        self.handle_connection_error(self.recv_field_info, "在游戏时与服务器链接失效(获取全局信息)")
+        print("游戏开始，你是一名" + "玩家" if self.is_player else f"旁观者({self.users_name[self.client_player]})")
         while True:
-            try:
-                self.recv_round_info()
-            except Exception as e:
-                print(f"\x1b[31m\x1b[1mConnection reset error when getting round info: {e}\x1b[0m")
-                os._exit(1)
+            self.handle_connection_error(self.recv_round_info, "在游戏时与服务器链接失效(获取牌局信息)")
             # UI
             last_player = utils.last_played(self.users_played_cards, self.now_player)
             # 这里需要额外考虑一个情况就是当一个人打完所有牌，所有玩家无法跟时
@@ -271,7 +267,7 @@ class Client:
                 break
             # 轮到出牌
             if self.is_player and self.client_player == self.now_player:
-                try:
+                def player_playing_cards():
                     new_played_cards, new_score = playing(self.client_cards, last_player, 
                                 self.client_player, self.users_played_cards, self)
                     new_played_cards.sort(key = utils.str_to_int)
@@ -281,9 +277,7 @@ class Client:
                             self.client_cards.remove(card)
                     self.now_score += new_score
                     self.send_player_info()
-                except Exception as e:
-                    print(f"\x1b[31m\x1b[1mConnection reset error when playing: {e}\x1b[0m")
-                    os._exit(1)
+                self.handle_connection_error(player_playing_cards, "在游戏时与服务器链接失效(用户打牌)")
 
 def ctrl_c_handler():
     print("Keyboard Interrupt")

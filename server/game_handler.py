@@ -2,8 +2,8 @@ import json
 import struct
 import secrets
 import string
-import time
 import logger
+import utils
 from player import Player
 from onlooker import Onlooker
 from game_vars import gvar
@@ -114,7 +114,7 @@ class Game_Handler(BaseRequestHandler):
                     self.is_player = False
                     self.client_player = secrets.randbelow(6)
                     self.send_data(None)
-                    print(f"\x1b[32m\x1b[1mOnlooker {user_name}({self.pid}) joined game -> player: {self.client_player}\x1b[0m")
+                    utils.success(f"Onlooker {user_name}({self.pid}) joined game -> player: {self.client_player}")
                 else:
                     self.is_player = True
                     self.client_player = gvar.users_player_id[user_idx]
@@ -123,7 +123,7 @@ class Game_Handler(BaseRequestHandler):
                     while gvar.users_cookie.get(self.user_cookie) is not None:
                         self.user_cookie = self.generate_cookie()
                     self.send_data(self.user_cookie)
-                    print(f"\x1b[32m\x1b[1mPlayer {user_name}({self.client_player}, {self.pid}) joined game -> cookie: {self.user_cookie}\x1b[0m")
+                    utils.success(f"Player {user_name}({self.client_player}, {self.pid}) joined game -> cookie: {self.user_cookie}")
                     logger.info(f"{user_name}({self.client_player}, {self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
@@ -143,12 +143,12 @@ class Game_Handler(BaseRequestHandler):
                     gvar.users_error[self.client_player] = False
                     user_name, old_pid = gvar.users_info[self.client_player]
                     gvar.users_info[self.client_player] = (user_name, self.pid)
-                    print(f"\x1b[32m\x1b[1m{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}\x1b[0m")
+                    utils.success(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
                 else:
                     self.send_data(False)
-                    raise RuntimeError("recover failed because user is playing")
+                    raise RuntimeError("Recover failed because user is playing")
         except Exception as e:
-            print(f"\x1b[31m\x1b[1m{self.pid} error recieving user info: {e}\x1b[0m")
+            utils.error(f"{self.pid} error recieving user info: {e}")
             return False
         else:
             return True

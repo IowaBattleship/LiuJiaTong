@@ -1,5 +1,4 @@
 from typing import List
-import utils
 import sys
 import os
 
@@ -204,10 +203,12 @@ def print_chapter(chapter: Chapter, th: TerminalHandler):
         print_paragraph(paragraph, th)
 
 def print_hline(th: TerminalHandler):
+    assert th.column == 0, th.column
     print_str = '+' + '-' * (th.max_column - 2) + '+'
     th.print_string(print_str, new_line=True)
 
 def print_article(article: Article, th: TerminalHandler):
+    assert len(article) > 0
     print_hline(th)
     for chapter in article:
         print_chapter(chapter, th)
