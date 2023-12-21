@@ -203,15 +203,6 @@ def playing(
     new_played_cards = []
     new_score = 0
 
-    if os.name == 'posix':
-        #关闭核显，这里偷个懒假设大家都有stty程序
-        #echo 核显，icanon 禁止缓冲
-        os.system("stty -echo -icanon")
-    elif os.name == 'nt':
-        pass
-    else:
-        raise RuntimeError('unknow os!') 
-
     logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
     while True:
         new_played_cards = read_userinput(client_cards)
@@ -227,13 +218,5 @@ def playing(
             break
         g_terminal_handler.err = '(非法牌型)'
         g_terminal_handler.print()
-
-    if os.name == 'posix':
-        #恢复核显
-        os.system("stty echo icanon")
-    elif os.name == 'nt':
-        pass
-    else:
-        raise RuntimeError('unknow os!') 
     
     return new_played_cards, new_score

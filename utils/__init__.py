@@ -1,4 +1,4 @@
-import os
+import os, sys
 import threading
 
 def str_to_int(c=''):
@@ -72,6 +72,7 @@ def error(string: str):
 
 def fatal(string: str):
     error(string)
+    enable_echo()
     os._exit(1)
 
 def user_confirm(prompt: str, default: bool):
@@ -133,3 +134,22 @@ def register_signal_handler(ctrl_c_handler):
         win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
     else:
         raise RuntimeError("Unknown os")
+
+if os.name == "posix":
+    import termios
+    old_termios_setting = termios.tcgetattr(sys.stdin)
+    def disable_echo():
+        termios_setting = termios.tcgetattr(sys.stdin)
+        termios_setting[3] &= ~termios.ECHO
+        termios_setting[3] &= ~termios.ICANON
+        termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, termios_setting)
+    def enable_echo():
+        global old_termios_setting
+        termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, old_termios_setting)
+elif os.name == "nt":
+    def disable_echo():
+        pass
+    def enable_echo():
+        pass
+else:
+    raise RuntimeError("Unknown os")

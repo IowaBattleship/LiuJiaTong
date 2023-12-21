@@ -227,8 +227,7 @@ class Client:
             return ret
         except Exception as e:
             self.close()
-            utils.error(f"{msg}: {e}")
-            exit(1)
+            utils.fatal(f"{msg}: {e}")
 
     def run(self):
         self.handle_connection_error(self.send_user_info, "在注册时与服务器的链接失效")
@@ -280,8 +279,7 @@ class Client:
                 self.handle_connection_error(player_playing_cards, "在游戏时与服务器链接失效(用户打牌)")
 
 def ctrl_c_handler():
-    print("Keyboard Interrupt")
-    os._exit(1)
+    utils.fatal("Keyboard Interrupt")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统客户端')
@@ -301,5 +299,7 @@ if __name__ == '__main__':
         client.config = Config(args.ip, args.port, args.user_name)
 
     client.connect(client.config.ip, client.config.port)
+    utils.disable_echo()
     client.run()
+    utils.enable_echo()
     client.close()

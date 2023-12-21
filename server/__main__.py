@@ -28,8 +28,7 @@ def ctrl_c_handler():
         return
     with ctrl_c_handler_lock:
         if utils.user_confirm(prompt="是否强退服务端？",default=False) is True:
-            print("Keyboard Interrupt")
-            os._exit(1)
+            utils.fatal("Keyboard Interrupt")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统服务端')
