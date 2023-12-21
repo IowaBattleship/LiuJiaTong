@@ -117,7 +117,9 @@ elif os.name == 'nt':
         if fst_byte == '\xe0':
             return read_direction()
         fst_byte = fst_byte.upper()
-        if fst_byte == '\x08':
+        if fst_byte == '\x03':
+            utils.fatal("Keyboard Interrupt")
+        elif fst_byte == '\x08':
             return SpecialInput.backspace
         elif fst_byte in ['\r', '\t', 'C', 'F']:
             return fst_byte
