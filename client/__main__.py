@@ -19,6 +19,14 @@ from terminal_printer import TerminalHandler
 import logger
 
 CONFIG_NAME = 'LiuJiaTong.json'
+ASCII_ART = '''
+    __    _              ___          ______                 
+   / /   (_)_  __       / (_)___ _   /_  __/___  ____  ____ _
+  / /   / / / / /  __  / / / __ `/    / / / __ \/ __ \/ __ `/
+ / /___/ / /_/ /  / /_/ / / /_/ /    / / / /_/ / / / / /_/ / 
+/_____/_/\__,_/   \____/_/\__,_/    /_/  \____/_/ /_/\__, /  
+                                                    /____/   
+'''
 
 class Config:
     def __init__(self, ip, port, name, cookie=None):
@@ -169,7 +177,7 @@ class Client:
         # 重发cookie的同时还得同步用户名
         if_valid_cookie = self.recv_data()
         if if_valid_cookie:
-            print("cookie合法，开始恢复")
+            utils.success("cookie合法，开始恢复")
             if_recovery = self.recv_data()
             if if_recovery is False:
                 raise RuntimeError("恢复失败，是不是有客户端还在运行？")
@@ -231,6 +239,7 @@ class Client:
 
     def run(self):
         self.handle_connection_error(self.send_user_info, "在注册时与服务器的链接失效")
+        print(ASCII_ART)
         self.handle_connection_error(self.recv_waiting_hall_info, "在游戏时与服务器链接失效(等待大厅)")
         self.handle_connection_error(self.recv_field_info, "在游戏时与服务器链接失效(获取全局信息)")
         print("游戏开始，你是一名" + "玩家" if self.is_player else f"旁观者({self.users_name[self.client_player]})")
