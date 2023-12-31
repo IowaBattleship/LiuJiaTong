@@ -118,6 +118,7 @@ class Manager(GameStateMachine):
             gvar.init_global_env(self.static_user_order)
         with gvar.game_lock:
             gvar.init_game_env()
+        self.__game_over = 0
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
     def next_turn(self): 
