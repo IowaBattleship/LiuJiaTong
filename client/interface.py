@@ -132,6 +132,8 @@ def gen_player_field_paragraph(
     else:
         player_name.string += '     '
     # 输出名字
+    if is_current_player:
+        player_name.string += "*"
     player_name.string += f'{name:<{name_maxlen}}'
     paragraph.append(player_name)
 

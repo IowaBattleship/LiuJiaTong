@@ -112,11 +112,12 @@ class Manager(GameStateMachine):
         with gvar.users_info_lock:
             logger.info(f"Manager: New game --- Round {gvar.serving_game_round}")
         with gvar.game_lock:
-            gvar.init_game_env()
             init_cards()  # 初始化牌并发牌
     def game_over(self): 
         with gvar.users_info_lock:
             gvar.init_global_env(self.static_user_order)
+        with gvar.game_lock:
+            gvar.init_game_env()
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
     def next_turn(self): 
