@@ -8,6 +8,8 @@ utils.check_packages({
         ("win32con", "pypiwin32"),
     ],
 })
+import sound
+sound.check_sound_player()
 import json
 import socket
 import struct

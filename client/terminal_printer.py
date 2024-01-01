@@ -213,7 +213,8 @@ def print_sentence(sentence: Sentence, th: TerminalHandler):
 def print_paragraph(paragraph: Paragraph, th: TerminalHandler):
     assert len(paragraph) > 0
     is_first = True
-    for sentence in paragraph:
+    for i in range(len(paragraph)):
+        sentence = paragraph[i]
         if is_first:
             th.print_string('|', new_line=False)
             is_first = False
@@ -223,7 +224,12 @@ def print_paragraph(paragraph: Paragraph, th: TerminalHandler):
             assert th.column < th.max_column - 1
             th.print_string(' ', new_line=False)
         print_sentence(sentence, th)
-        print_sentence(gen_padding_sentence(sentence), th)
+        padding_sen = gen_padding_sentence(sentence)
+        if i + 1 == len(paragraph) and padding_sen.columns() > 0:
+            if padding_sen.columns() + th.column > th.max_column - 1:
+                padding_length = th.max_column - 1 - th.column
+                padding_sen.string = ' ' * padding_length
+        print_sentence(padding_sen, th)
     padding_str = ' ' * (th.max_column - 1 - th.column) + '|'
     th.print_string(padding_str, new_line=True)
 

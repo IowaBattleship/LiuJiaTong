@@ -1,12 +1,12 @@
 import os
 import sys
 import time
-import select
 import logger
 import utils
 from enum import Enum, auto
 from playingrules import if_input_legal
 from terminal_printer import *
+import sound
 class SpecialInput(Enum):
     left_arrow = auto(),
     right_arrow = auto(),
@@ -42,49 +42,67 @@ class PlayingTerminalHandler(TerminalHandler):
 
 g_terminal_handler = None
 g_tcp_handler = None
+HANG_OUT_COUNTER = 10
+g_user_hang_out_counter = HANG_OUT_COUNTER
 
-def wait_for_input(check_have_input):
+def check_user_hang_out():
+    global g_user_hang_out_counter
+    if g_user_hang_out_counter > 0:
+        g_user_hang_out_counter -= 1
+        if g_user_hang_out_counter == 0:
+            sound.playsound("ahoo", True, None)
+
+def reset_user_hang_out():
+    global g_user_hang_out_counter
+    g_user_hang_out_counter = HANG_OUT_COUNTER
+
+def clear_user_hang_out():
+    global g_user_hang_out_counter
+    g_user_hang_out_counter = 0
+
+def wait_for_input():
     TCP_COUNTER = 20
-    check_tcp_counter = 0
+    check_tcp_counter = TCP_COUNTER
     while check_have_input() is False:
         if check_tcp_counter == 0:
             g_tcp_handler.send_playing_heartbeat(finished=False)
+            check_user_hang_out()
             check_tcp_counter = TCP_COUNTER
         check_tcp_counter -= 1
         time.sleep(0.05)
+    clear_user_hang_out()
 
-# io系列函数
-# now_played_cards: 用户已经输入好的字符串
-# cursor: 光标位置
-# user_cards: 用户已有的卡牌
-# 输出新的now_played_cards, cursor二元组
 if os.name == 'posix':
     # linux & mac
-    def read_byte(if_remaining: bool) -> str:
-        if if_remaining:
-            return sys.stdin.read(1)
-        def check_have_input() -> bool:
-            return select.select([sys.stdin], [], [], 0) != ([], [], [])
-        wait_for_input(check_have_input)
-        return sys.stdin.read(1)
+    import select
+    def check_have_input() -> bool:
+        return select.select([sys.stdin], [], [], 0) != ([], [], [])
 
-    def read_direction():
-        if read_byte(True) != '[':
+    def read_byte(if_blocking: bool) -> str:
+        if if_blocking:
+            wait_for_input()
+        else:
+            if check_have_input() is False:
+                raise InputException('(非阻塞输入)')
+        return chr(sys.stdin.buffer.read1(1)[0])
+
+    def read_direction(if_blocking: bool):
+        if read_byte(if_blocking) != '[':
             raise InputException('(非法输入)')
         else:
-            dir = read_byte(True)
+            dir = read_byte(if_blocking)
             if dir == 'D':
                 return SpecialInput.left_arrow
             elif dir == 'C':
                 return SpecialInput.right_arrow
             else:
                 raise InputException('(非法输入)')
-    
-    def read_input():
-        fst_byte = read_byte(False).upper()
+
+    def read_input(if_blocking: bool):
+        fst_byte = read_byte(if_blocking).upper()
         if fst_byte == '\x1b':
             # 判断是否是左右方向键
-            return read_direction()
+            return read_direction(if_blocking)
         elif fst_byte == '\x7f':
             return SpecialInput.backspace
         elif fst_byte in ['\n', '\t', 'C', 'F']:
@@ -97,25 +115,30 @@ if os.name == 'posix':
 elif os.name == 'nt':
     # windows
     from msvcrt import getch, kbhit
-    def read_byte() -> str:
-        def check_have_input():
-            return kbhit() != 0
-        wait_for_input(check_have_input)
+    def check_have_input():
+        return kbhit() != 0
+
+    def read_byte(if_blocking: bool) -> str:
+        if if_blocking:
+            wait_for_input()
+        else:
+            if check_have_input() is False:
+                raise InputException('(非阻塞输入)')
         return chr(getch()[0])
         
-    def read_direction():
-        dir = read_byte()
+    def read_direction(if_blocking: bool):
+        dir = read_byte(if_blocking)
         if dir == 'K':
             return SpecialInput.left_arrow
         elif dir == 'M':
             return SpecialInput.right_arrow
         else:
             raise InputException('(非法输入)')
-    
-    def read_input():
-        fst_byte = read_byte()
+
+    def read_input(if_blocking: bool):
+        fst_byte = read_byte(if_blocking)
         if fst_byte == '\xe0':
-            return read_direction()
+            return read_direction(if_blocking)
         fst_byte = fst_byte.upper()
         if fst_byte == '\x03':
             utils.fatal("Keyboard Interrupt")
@@ -128,13 +151,40 @@ elif os.name == 'nt':
         else:
             raise InputException('(非法输入)')
 
+g_input_buffer = []
+def prepare_input_buffer():
+    global g_input_buffer
+    try:
+        g_input_buffer = []
+        while True:
+            g_input_buffer.append(read_input(if_blocking=False))
+    except InputException:
+        g_input_buffer = [x for x in g_input_buffer if x not in ['\r', '\n']]
+        import logger
+        logger.info(f"{g_input_buffer}")
+
+def read_input_buffer():
+    global g_input_buffer
+    if len(g_input_buffer) > 0:
+        input = g_input_buffer[0]
+        g_input_buffer = g_input_buffer[1:]
+        return input
+    else:
+        return None
+
+def get_input():
+    input = read_input_buffer()
+    if input is not None:
+        return input
+    return read_input(if_blocking=True)
+
 def read_userinput(client_cards):
     th = g_terminal_handler
     while True:
         assert(th.cursor <= len(th.new_played_cards))
         end_input = False
         try:
-            input = read_input()
+            input = get_input()
             if input == SpecialInput.left_arrow:
                 if th.cursor > 0:
                     th.cursor -= 1
@@ -198,6 +248,8 @@ def playing(
 ):
     global g_tcp_handler
     g_tcp_handler = tcp_handler
+    reset_user_hang_out()
+    prepare_input_buffer()
     print('请输入要出的手牌(\'F\'表示跳过):')
     global g_terminal_handler
     g_terminal_handler = PlayingTerminalHandler()

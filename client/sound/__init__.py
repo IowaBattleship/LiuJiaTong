@@ -2,6 +2,23 @@ import os
 import threading
 import platform
 import subprocess
+import utils
+
+def check_sound_player():
+    def __checker(cmd: list[str], obj: str):
+        try:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+        except:
+            utils.fatal(f'This game needs "{obj}" to play sound, please install it')
+    
+    if platform.system() == "Darwin":
+        __checker(["afplay"], "afplay")
+    elif platform.system() == "Linux":
+        __checker(["aplay"], "aplay")
+    elif platform.system() == "Windows":
+        __checker(["powershell", "-c", "New-Object", "Media.SoundPlayer"], "Media.SoundPlayer")
+    else:
+        raise RuntimeError('Unknown os') 
 
 def __playsound(paths: list[str], playtime):
     for path in paths:
@@ -14,7 +31,7 @@ def __playsound(paths: list[str], playtime):
         elif platform.system() == "Windows":
             cmd = f"powershell -c (New-Object Media.SoundPlayer '{path}').PlaySync()"
         else:
-            raise RuntimeError('unknow os!') 
+            raise RuntimeError('Unknown os') 
         subprocess.Popen(
             cmd.split(),
             stdout=subprocess.DEVNULL,
