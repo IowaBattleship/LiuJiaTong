@@ -9,6 +9,10 @@ class Player(GameStateMachine):
     def __handle_error(self, e):
         utils.error(f"Player {self.pid}({self.client_player}, {self.state}) error: {e}")
         self.error = True
+    def __update_local_cache(self):
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
+            self.__now_player = gvar.now_player
     # 抽象类方法
     def game_start(self): 
         raise RuntimeError("Unsupport state")
@@ -80,6 +84,8 @@ class Player(GameStateMachine):
         raise RuntimeError("Unsupport state")
     def game_start_sync(self): 
         gvar.game_start_barrier.wait()
+        # 这里放松了条件，因为在下一个同步点之前数据是只读的
+        self.__update_local_cache()
     def send_round_info_sync(self): 
         gvar.send_round_info_barrier.wait()
     def recv_player_info_sync(self): 
@@ -87,9 +93,7 @@ class Player(GameStateMachine):
     def next_turn_sync(self): 
         gvar.next_turn_barrier.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
-        with gvar.game_lock:
-            self.__game_over = gvar.game_over
-            self.__now_player = gvar.now_player
+        self.__update_local_cache()
     
     # 这个代码太tm抽象了，看我画的drawio的图，为了支持断线重连真不容易……
     def get_next_state(self) -> bool:
@@ -192,6 +196,4 @@ class Player(GameStateMachine):
         _, self.pid = tcp_handler.client_address
         
         self.error = False
-        with gvar.game_lock:
-            self.__game_over = gvar.game_over
-            self.__now_player = gvar.now_player
+        self.__update_local_cache()

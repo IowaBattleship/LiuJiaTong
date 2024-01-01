@@ -30,7 +30,7 @@ def init_cards():
 1, -1 分别表示偶数队获胜,双统
 2, -2 分别表示奇数队获胜,双统
 '''
-def if_game_over():
+def if_game_over() -> bool:
     assert gvar.game_lock.locked()
     # 没有头科肯定没有结束
     if gvar.head_master == -1:
@@ -42,6 +42,10 @@ def if_game_over():
         elif (gvar.team_score[i] >= 200 and gvar.team_out[1 - i] != 0) or gvar.team_out[i] == 3:
             return i + 1
     return 0
+
+def if_run_out(player: int) -> bool:
+    assert gvar.game_lock.locked()
+    return len(gvar.users_cards[player]) == 0
 
 # 下一位玩家出牌
 def set_next_player():
@@ -58,72 +62,78 @@ def get_next_turn():
     else:
         gvar.last_player = gvar.now_player
     
-    # 此轮逃出，更新队伍信息、头科，判断游戏是否结束
-    if len(gvar.users_cards[gvar.now_player]) == 0:
+    assert gvar.last_player != -1
+    # 此轮逃出，更新队伍信息、头科
+    if if_run_out(gvar.now_player):
         gvar.team_out[gvar.now_player % 2] += 1
         if gvar.head_master == -1:
             gvar.head_master = gvar.now_player
-            for i in range(6):
-                if i % 2 == gvar.head_master % 2:
-                    gvar.team_score[i % 2] += gvar.users_score[i]
-        # 若队伍有头科，就不需要累加，没有则累加
-        elif gvar.head_master % 2 != gvar.now_player % 2:
-            gvar.team_score[gvar.now_player % 2] += gvar.users_score[gvar.now_player]
 
-        gvar.game_over = if_game_over()
-    
     # 更新一下打牌的user
     set_next_player()
     # 玩家是否打完所有的牌
     # 不在打完之后马上结算是因为玩家的分没拿
     # 考虑到有多个人同时打完牌的情况，得用循环
-    while len(gvar.users_cards[gvar.now_player]) == 0 \
-            and gvar.last_player != gvar.now_player:
+    while if_run_out(gvar.now_player) and gvar.last_player != gvar.now_player:
         gvar.users_finished[gvar.now_player] = True
         gvar.users_played_cards[gvar.now_player].clear()
         set_next_player()
-    
+
     # 一轮结束，统计此轮信息
     if gvar.last_player == gvar.now_player:
         # 统计用户分数
         gvar.users_score[gvar.now_player] += gvar.now_score
-        # 队伍有头科，此轮分数直接累加到队伍分数中
-        if gvar.head_master != -1 and gvar.now_player % 2 == gvar.head_master % 2:
-            gvar.team_score[gvar.now_player % 2] += gvar.now_score
-        # 若是刚好此轮逃出，此轮分数也直接累加到队伍分数中
-        elif len(gvar.users_cards[gvar.now_player]) == 0:
-            gvar.team_score[gvar.now_player % 2] += gvar.now_score
-        # 判断游戏是否结束
-        gvar.game_over = if_game_over()
         # 初始化场上分数
         gvar.now_score = 0
         # 如果刚好在此轮逃出，第一个出牌的人就要改变
-        if len(gvar.users_cards[gvar.now_player]) == 0:
+        if if_run_out(gvar.now_player):
             gvar.users_finished[gvar.now_player] = True
             gvar.users_played_cards[gvar.now_player].clear()
             set_next_player()
-            gvar.last_player = gvar.now_player
-
+            gvar.last_player = -1
     # 清除当前玩家的场上牌
     gvar.users_played_cards[gvar.now_player].clear()
 
+def check_game_over():
+    assert gvar.game_lock.locked()
+    # 重新统计队伍得分
+    gvar.team_score = [0, 0]
+    for i in range(6):
+        # 有头科的队伍统计所有成员分数
+        if gvar.head_master != -1 and gvar.head_master % 2 == i % 2:
+            gvar.team_score[i % 2] += gvar.users_score[i]
+        # 如果用户逃出，记录成员分数
+        elif if_run_out(i):
+            gvar.team_score[i % 2] += gvar.users_score[i]
+    # 检查游戏是否结束
+    gvar.game_over = if_game_over()
+
+def take_turn_log():
+    assert gvar.game_lock.locked()
+    logger.info(f"Manager: now_player {gvar.now_player}, team_score {gvar.team_score}, team_out {gvar.team_out}, game_over {gvar.game_over}")
+
 class Manager(GameStateMachine):
+    # 私有方法
+    def __update_local_cache(self):
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
+    # 抽象类方法
     def game_start(self): 
         with gvar.users_info_lock:
             logger.info(f"Manager: New game --- Round {gvar.serving_game_round}")
         with gvar.game_lock:
+            gvar.init_game_env()
             init_cards()  # 初始化牌并发牌
     def game_over(self): 
         with gvar.users_info_lock:
             gvar.init_global_env(self.static_user_order)
-        with gvar.game_lock:
-            gvar.init_game_env()
-        self.__game_over = 0
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
     def next_turn(self): 
         with gvar.game_lock:
             get_next_turn()
+            check_game_over()
+            take_turn_log()
     def send_waiting_hall_info(self):
         raise RuntimeError("Unsupport state")
     def send_field_info(self): 
@@ -151,6 +161,8 @@ class Manager(GameStateMachine):
     def game_start_sync(self): 
         gvar.game_start_barrier.wait()
         gvar.game_start_barrier.reset()
+        # 这里放松了条件，因为在下一个同步点之前数据是只读的
+        self.__update_local_cache()
         assert gvar.onlooker_lock.locked()
         # 在游戏还没开始前由manager将其锁住
         gvar.onlooker_lock.release()
@@ -168,8 +180,7 @@ class Manager(GameStateMachine):
         gvar.next_turn_barrier.wait()
         gvar.next_turn_barrier.reset()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
-        with gvar.game_lock:
-            self.__game_over = gvar.game_over
+        self.__update_local_cache()
     
     # 这个代码太tm抽象了，看我画的drawio的图，为了支持断线重连真不容易……
     def get_next_state(self) -> bool:
@@ -208,5 +219,4 @@ class Manager(GameStateMachine):
         gvar.onlooker_lock.acquire()
         with gvar.users_info_lock:
             gvar.init_global_env(self.static_user_order)
-        with gvar.game_lock:
-            self.__game_over = gvar.game_over
+        self.__update_local_cache()

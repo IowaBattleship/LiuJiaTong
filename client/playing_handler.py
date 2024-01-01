@@ -99,7 +99,7 @@ elif os.name == 'nt':
     from msvcrt import getch, kbhit
     def read_byte() -> str:
         def check_have_input():
-            return kbhit()
+            return kbhit() != 0
         wait_for_input(check_have_input)
         return chr(getch()[0])
         

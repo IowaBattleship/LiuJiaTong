@@ -12,7 +12,7 @@ class Game_Var:
         self.now_score = 0  # 场上分数
         self.now_player = 0  # 当前出牌玩家
         self.head_master = -1  # 头科玩家下标
-        self.last_player = 0  # 上一位出牌玩家
+        self.last_player = -1  # 上一位出牌玩家
         self.team_score = [0, 0]  # 各队分数
         self.team_out = [0, 0]  # 各队逃出人数
         self.game_over = 0 # 游戏结束状态

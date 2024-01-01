@@ -1,6 +1,7 @@
 from typing import List
 import sys
 import os
+import platform
 
 def columns(string: str) -> int:
     columns = 0
@@ -22,6 +23,7 @@ class TerminalHandler:
         self.highlight = False
         self.underline = False
         self.blink = False
+        self.strikethrough = False
     
     def update_max_column(self, max_column: int):
         self.max_column = os.get_terminal_size().columns - 1
@@ -51,7 +53,8 @@ class TerminalHandler:
     def reset_font(self):
         print("\x1b[0m", end='')
         self.color = 0
-        self.highlight = self.underline = self.blink = False
+        self.highlight = self.underline = \
+        self.blink = self.strikethrough = False
     
     def set_color(self, color: int):
         print(f"\x1b[{color}m", end='')
@@ -69,11 +72,20 @@ class TerminalHandler:
         print("\x1b[5m", end='')
         self.blink = True
     
+    def set_strikethrough(self):
+        print("\x1b[9m", end='')
+        self.strikethrough = True
+    
     def flush(self):
         sys.stdout.flush()
 
     def flush_buffer(self, new_line: bool):
-        print(self.row_buffer, end='\n' if new_line else '')
+        if platform.system() == "Darwin" and self.strikethrough:
+            for ch in self.row_buffer:
+                print(ch + '\u0336', end='')
+            print('', end='\n' if new_line else '')
+        else:
+            print(self.row_buffer, end='\n' if new_line else '')
         self.row_buffer = ""
         if new_line:
             self.row += 1
@@ -103,6 +115,8 @@ class Sentence:
     :color : 如果color为0则打印白色字符，否则打印对应的颜色的字符，控制序列格式串为f'\\x1b[{color}m'
     :blink : 是否需要闪烁字符串
     :underline : 是否需要对字符串添加下划线
+    :strikethrough : 是否需要对字符串添加删除线
+    :minwidth : 打印出来的最小长度，多余的部分补空格并不做任何渲染
     """
     def __init__(self):
         self.string: str = ""
@@ -110,12 +124,17 @@ class Sentence:
         self.color: int = 0
         self.blink: bool = False
         self.underline: bool = False
+        self.strikethrough: bool = False
+        self.minwidth: int = 0
 
     def __str__(self):
         return self.string
     
     def columns(self) -> int:
-        return columns(self.string)
+        return max(columns(self.string), self.minwidth)
+
+    def padding_length(self) -> int:
+        return max(0, self.minwidth - columns(self.string))
     
     def print_font_format(self, th: TerminalHandler):
         if self.highlight:
@@ -126,6 +145,9 @@ class Sentence:
             th.set_blink()
         if self.underline:
             th.set_underline()
+        if self.strikethrough:
+            th.set_strikethrough()
+    
     # 打印self.string的[l,r)区间
     def print_range(self, th: TerminalHandler, l: int, r: int) -> bool:
         self.print_font_format(th)
@@ -166,6 +188,13 @@ def article_columns(article: Article) -> int:
         columns = max(columns, chapter_columns(chapter))
     return columns
 
+def gen_padding_sentence(sentence: Sentence) -> Sentence:
+    padding_sentence = Sentence()
+    padding_length = sentence.padding_length()
+    if padding_length > 0:
+        padding_sentence.string += " " * padding_length
+    return padding_sentence
+
 def print_sentence(sentence: Sentence, th: TerminalHandler):
     if sentence.string == "":
         return
@@ -194,8 +223,9 @@ def print_paragraph(paragraph: Paragraph, th: TerminalHandler):
             assert th.column < th.max_column - 1
             th.print_string(' ', new_line=False)
         print_sentence(sentence, th)
-    pad_str = ' ' * (th.max_column - 1 - th.column) + '|'
-    th.print_string(pad_str, new_line=True)
+        print_sentence(gen_padding_sentence(sentence), th)
+    padding_str = ' ' * (th.max_column - 1 - th.column) + '|'
+    th.print_string(padding_str, new_line=True)
 
 def print_chapter(chapter: Chapter, th: TerminalHandler):
     assert len(chapter) > 0

@@ -85,6 +85,7 @@ class Client:
         logger.info(f"----------new round------------")
         logger.info(f"cilent_cards: {self.client_cards}")
         logger.info(f"users_score: {self.users_score}")
+        logger.info(f"users_cards_num: {self.users_cards_num}")
         logger.info(f"users_played_cards: {self.users_played_cards}")
         logger.info(f"now_score: {self.now_score}")
         logger.info(f"now_player: {self.users_name[self.now_player]}")
@@ -271,6 +272,8 @@ class Client:
             self.is_start = True
             # 游戏结束
             if self.game_over != 0:
+                logger.info(f"game_over: {self.game_over}")
+                logger.info(f"users_cards: {self.users_cards}")
                 game_over_interface(self.client_player, self.game_over)
                 break
             # 轮到出牌

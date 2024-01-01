@@ -48,9 +48,9 @@ def waiting_hall_interface(th: TerminalHandler, users_name, users_error):
 
 def gen_help_chapter() -> Chapter:
     chapter = [
-        gen_paragraph("B 代表 10"),
-        gen_paragraph("0 代表 小王  1 代表 大王"),
+        gen_paragraph("B 代表 10  0 代表 小王  1 代表 大王"),
         gen_paragraph("tab键 补全牌  C键 清空手中的牌"),
+        gen_paragraph("左右方向键 改变输入的位置"),
     ]
     return chapter
 
@@ -62,9 +62,22 @@ def gen_score_chapter(
     chapter = []
 
     def gen_field_score() -> Paragraph:
-        score_on_field = Sentence()
-        score_on_field.string = f'当前场上分数:{now_score}'
-        return [score_on_field]
+        prompt = Sentence()
+        prompt.string = '当前场上分数:'
+        score = Sentence()
+        score.string = f'{now_score}'
+        score.highlight = True
+        if now_score == 0:
+            score.highlight = False
+        elif now_score <= 30 :
+            score.color = 34
+        elif now_score <= 80:
+            score.color = 33
+        else:
+            score.color = 33
+            score.blink = True
+            score.underline = True
+        return [prompt, score]
     chapter.append(gen_field_score())
 
     def gen_team_score() -> Paragraph:
@@ -75,7 +88,7 @@ def gen_score_chapter(
         for i in range(6):
             if i % 2 == client_player % 2:
                 score += users_score[i]
-        own_score.string = f'己方得分:{score}'
+        own_score.string = f'己方得分: {score}'
         own_score.highlight = True
         own_score.color = 32
         paragraph.append(own_score)
@@ -85,7 +98,7 @@ def gen_score_chapter(
         for i in range(6):
             if i % 2 != client_player % 2:
                 score += users_score[i]
-        opp_score.string = f'对方得分:{score}'
+        opp_score.string = f'对方得分: {score}'
         opp_score.highlight = True
         opp_score.color = 31
         paragraph.append(opp_score)
@@ -116,40 +129,43 @@ def gen_player_field_paragraph(
 ) -> Paragraph:
     paragraph = []
 
+    def set_color(sentence: Sentence):
+        # 如果是同一队的，就用绿色输出，否则用红色
+        if is_same_team:
+            sentence.color = 32
+        else:
+            sentence.color = 31
+        sentence.highlight = True
+
+    head_master = Sentence()
+    head_master.minwidth = 4
+    if is_head_master:
+        head_master.string += '头科'
+        set_color(head_master)
+    paragraph.append(head_master)
+
     player_name = Sentence()
-    player_name.highlight = True
-    # 如果是同一队的，就用绿色输出，否则用红色
-    if is_same_team:
-        player_name.color = 32
-    else:
-        player_name.color = 31
-    # 如果该玩家现在在打牌，则将其名字闪烁显示
+    player_name.minwidth = name_maxlen
+    set_color(player_name)
+    # 如果该玩家已经逃出，则将其名字打上删除线
+    if num_of_cards == 0:
+        player_name.strikethrough = True
+    # 如果该玩家现在在打牌，则将其名字闪烁显示并加上*
     if is_current_player:
         player_name.blink = True
-    # 如果当前玩家是头科，则在其前面写上
-    if is_head_master:
-        player_name.string += '头科 '
-    else:
-        player_name.string += '     '
-    # 输出名字
-    if is_current_player:
-        player_name.string += "*"
-    player_name.string += f'{name:<{name_maxlen}}'
+        player_name.string += "* "
+    player_name.string += name
     paragraph.append(player_name)
 
     player_score = Sentence()
-    player_score.highlight = True
-    # 如果是同一队的，就用绿色输出，否则用红色
-    if is_same_team:
-        player_score.color = 32
-    else:
-        player_score.color = 31
+    set_color(player_score)
     player_score.string += f'{num_of_cards:>2}张{score:>3}分'
     paragraph.append(player_score)
 
     player_played_cards = Sentence()
+    player_played_cards.minwidth = 20
     if is_last_player:
-        player_played_cards.underline = True
+        player_played_cards.underline = True 
     player_played_cards.string += gen_cards_string(played_cards)
     paragraph.append(player_played_cards)
 
@@ -192,7 +208,7 @@ def main_interface(
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
     name_maxlen = 8
     for i in range(6):
-        name_maxlen = max(name_maxlen, columns(users_name[i]))
+        name_maxlen = max(name_maxlen, columns(users_name[i]) + (2 if i == now_player else 0))
     # 输出其它玩家
     other_player_chapter = []
     client_player_chapter = []
@@ -276,7 +292,6 @@ def main_interface(
 
 
 def game_over_interface(client_player, if_game_over):
-    print('\n')
     if client_player % 2 + 1 == (if_game_over + 2) % 2:
         print('游戏结束，你的队伍获得了胜利', end='')
         if if_game_over < 0:

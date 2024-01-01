@@ -8,6 +8,9 @@ class Onlooker(GameStateMachine):
     def __handle_error(self, e):
         utils.error(f"Onlooker {self.pid}({self.state}) error: {e}")
         self.error = True
+    def __update_local_cache(self):
+        with gvar.game_lock:
+            self.__game_over = gvar.game_over
     # 抽象类方法
     def game_start(self): 
         raise RuntimeError("Unsupport state")
@@ -63,8 +66,7 @@ class Onlooker(GameStateMachine):
     def onlooker_sync(self): 
         gvar.onlooker_event.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
-        with gvar.game_lock:
-            self.__game_over = gvar.game_over
+        self.__update_local_cache()
         # 这里保证所有旁观者线程都进入了可发送状态
         # 不会因为manager线程对event的阻塞导致出问题
         gvar.onlooker_onlooker_sync_barrier.wait()
@@ -126,5 +128,4 @@ class Onlooker(GameStateMachine):
         _, self.pid = tcp_handler.client_address
         
         self.error = False
-        with gvar.game_lock:
-            self.__game_over = gvar.game_over
+        self.__update_local_cache()
