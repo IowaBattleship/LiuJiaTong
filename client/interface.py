@@ -207,8 +207,9 @@ def main_interface(
     # 输出得分
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
     __users_name = copy.deepcopy(users_name)
-    __users_name[now_player] = "* " + __users_name[now_player]
-    name_maxlen = 8
+    for i in range(6):
+        __users_name[i] = " " + ("*" if i == now_player else "") + __users_name[i] + " "
+    name_maxlen = 10
     for i in range(6):
         name_maxlen = max(name_maxlen, columns(__users_name[i]))
     # 输出其它玩家
