@@ -2,6 +2,7 @@ from sound import playsound, playsounds
 from playingrules import judge_and_transform_cards, CardType
 from terminal_printer import *
 import utils
+import copy
 
 def gen_paragraph(string: str) -> Paragraph:
     sentence = Sentence()
@@ -153,7 +154,6 @@ def gen_player_field_paragraph(
     # 如果该玩家现在在打牌，则将其名字闪烁显示并加上*
     if is_current_player:
         player_name.blink = True
-        player_name.string += "* "
     player_name.string += name
     paragraph.append(player_name)
 
@@ -206,16 +206,18 @@ def main_interface(
     help_chapter = gen_help_chapter()
     # 输出得分
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
+    __users_name = copy.deepcopy(users_name)
+    __users_name[now_player] = "* " + __users_name[now_player]
     name_maxlen = 8
     for i in range(6):
-        name_maxlen = max(name_maxlen, columns(users_name[i]) + (2 if i == now_player else 0))
+        name_maxlen = max(name_maxlen, columns(__users_name[i]))
     # 输出其它玩家
     other_player_chapter = []
     client_player_chapter = []
     for i in range(0, 6):
         player = (client_player + i + 1) % 6
         player_field_paragraph = gen_player_field_paragraph(
-            name=users_name[player],
+            name=__users_name[player],
             name_maxlen=name_maxlen,
             num_of_cards=users_cards_num[player],
             score=users_score[player],
