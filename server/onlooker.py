@@ -21,11 +21,10 @@ class Onlooker(GameStateMachine):
         assert self.error is False
         try:
             while True:
-                if_locked = gvar.onlooker_lock.acquire(timeout=1)
                 with gvar.users_info_lock:
                     if self.serving_game_round < gvar.serving_game_round:
                         raise RuntimeError("Game end")
-                if if_locked:
+                if gvar.onlooker_lock.acquire(timeout=1):
                     gvar.onlooker_number += 1
                     gvar.onlooker_lock.release()
                     break
@@ -73,7 +72,7 @@ class Onlooker(GameStateMachine):
     def game_start_sync(self): 
         raise RuntimeError("Unsupport state")
     def send_round_info_sync(self): 
-        if self.error:
+        if self.error or self.__game_over != 0:
             assert gvar.onlooker_lock.locked()
             with gvar.onlooker_local_lock:
                 gvar.onlooker_number -= 1
