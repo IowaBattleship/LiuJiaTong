@@ -295,7 +295,7 @@ def main_interface(
 
 
 def game_over_interface(client_player, if_game_over):
-    if client_player % 2 + 1 == (if_game_over + 2) % 2:
+    if (client_player + 1) % 2 == (if_game_over + 2) % 2:
         print('游戏结束，你的队伍获得了胜利', end='')
         if if_game_over < 0:
             print('，并成功双统')
