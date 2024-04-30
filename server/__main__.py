@@ -42,6 +42,7 @@ if __name__ == '__main__':
     threading.Thread(target=manager_thread,args=(args.static,)).start()
     try:
         server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
+        server.allow_reuse_port = True
         manager_barrier.wait()
         print("Listening")
         server.serve_forever()
