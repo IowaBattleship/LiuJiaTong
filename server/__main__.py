@@ -30,6 +30,10 @@ def ctrl_c_handler():
         if utils.user_confirm(prompt="是否强退服务端？",default=False) is True:
             utils.fatal("Keyboard Interrupt")
 
+class ReusableTCPServer(ThreadingTCPServer):
+    allow_reuse_address = True
+    allow_reuse_port = True
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统服务端')
     parser.add_argument('--ip', type=str, default='0.0.0.0', help='listening ip (default: %(default)s)')
@@ -41,8 +45,7 @@ if __name__ == '__main__':
     utils.register_signal_handler(ctrl_c_handler)
     threading.Thread(target=manager_thread,args=(args.static,)).start()
     try:
-        server = ThreadingTCPServer((args.ip, args.port), Game_Handler)
-        server.allow_reuse_port = True
+        server = ReusableTCPServer((args.ip, args.port), Game_Handler)
         manager_barrier.wait()
         print("Listening")
         server.serve_forever()
