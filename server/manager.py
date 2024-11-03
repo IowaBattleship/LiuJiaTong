@@ -3,7 +3,7 @@ import copy
 import threading
 import logger
 
-import utils.card as card
+import card as card
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
 

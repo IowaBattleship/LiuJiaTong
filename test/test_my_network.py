@@ -6,7 +6,7 @@ import time
 import threading
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.my_network import send_data_to_socket, recv_data_from_socket
+from my_network import send_data_to_socket, recv_data_from_socket
 
 def start_server(host, port, server_socket):
     server_socket.bind((host, port))

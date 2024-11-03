@@ -125,9 +125,9 @@ def gen_cards_string(cards: list[str]) -> str:
     for i in range(len(cards)):
         # 11/03/2024: 支持花色
         # 不同的牌之间用空格隔开
-        if i != 0 and cards[i].value != cards[i - 1].value:
+        if i != 0 and cards[i].get_cli_str() != cards[i - 1].get_cli_str():
             string += ' '
-        string += cards[i].value
+        string += cards[i].get_cli_str()
     return string
 
 def gen_player_field_paragraph(

@@ -1,5 +1,3 @@
-import json
-import struct
 import secrets
 import string
 import logger
@@ -8,7 +6,7 @@ from player import Player
 from onlooker import Onlooker
 from game_vars import gvar
 from socketserver import BaseRequestHandler
-from utils.my_network import recv_data_from_socket, send_data_to_socket
+from my_network import recv_data_from_socket, send_data_to_socket
 
 class Game_Handler(BaseRequestHandler):
     def __init__(self, request, client_address, server):

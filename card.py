@@ -27,6 +27,17 @@ class Card:
     def to_dict(self):
         # 返回一个可以被 json.dumps() 序列化的字典
         return {'suit': self.suit.value, 'value': self.value}
+    
+    # 用于在 CLI 中显示
+    def get_cli_str(self):
+        if self.value == 14:
+            return "2"
+        elif self.value == 15:
+            return "0"
+        elif self.value == 16:
+            return "1"
+        else:
+            return str(self.value)
 
 def generate_cards() -> list[Card]:
     cards = []

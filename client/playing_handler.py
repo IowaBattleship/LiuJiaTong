@@ -7,6 +7,8 @@ from enum import Enum, auto
 from playingrules import if_input_legal
 from terminal_printer import *
 import sound
+from card import Card
+
 class SpecialInput(Enum):
     left_arrow = auto(),
     right_arrow = auto(),
@@ -240,12 +242,13 @@ def read_userinput(client_cards):
 # users_played_cards: 场上所有牌信息
 # tcp_handler: 客户端句柄，用于检测远端是否关闭了
 def playing(
-    client_cards,
-    last_player: int,
-    client_player: int,
-    users_played_cards,
-    tcp_handler
+    client_cards : list[Card], # 用户所持卡牌信息
+    last_player  : int,        # 最后打出牌的玩家
+    client_player: int,        # 客户端正在输入的玩家
+    users_played_cards: list[Card], # 场上所有牌信息
+    tcp_handler # 客户端句柄，用于检测远端是否关闭了
 ):
+    logger.info(f"playing(client_cards: {client_cards}, last_player: {last_player}, client_player: {client_player}, users_played_cards: {users_played_cards})")
     global g_tcp_handler
     g_tcp_handler = tcp_handler
     reset_user_hang_out()

@@ -1,6 +1,14 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from game_handler import Game_Handler
+from manager import Manager
+import logger
+import threading
+import argparse
+import threading
+from my_network import ReusableTCPServer
 import utils
 utils.check_packages({
     "nt": [
@@ -8,13 +16,6 @@ utils.check_packages({
         ("win32con", "pypiwin32"),
     ],
 })
-from game_handler import Game_Handler
-from manager import Manager
-import logger
-import threading
-import argparse
-import threading
-from utils.my_network import ReusableTCPServer
 
 manager_barrier = threading.Barrier(2)
 def manager_thread(static_user_order):
