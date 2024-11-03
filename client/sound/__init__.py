@@ -21,6 +21,11 @@ def check_sound_player():
         raise RuntimeError('Unknown os') 
 
 def __playsound(paths: list[str], playtime):
+    '''
+    播放音频
+    :param paths: 需要播放的音频文件
+    :param playtime: 该参数无效
+    '''
     for path in paths:
         assert os.path.isabs(path), path
         cmd = ""

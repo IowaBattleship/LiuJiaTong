@@ -9,18 +9,18 @@ from enum import Enum
 '''
 # 出牌类型
 class CardType(Enum):
-    illegal_type = 0
-    normal_bomb = 1
-    black_joker_bomb = 2
-    red_joker_bomb = 3
-    straight = 4
-    straight_pairs = 5
-    straight_triples = 6
-    flight = 7
-    single = 8
-    pair = 9
-    triple = 10
-    triple_pair = 11
+    illegal_type     = 0 # 非法牌型
+    normal_bomb      = 1 # 普通炸弹
+    black_joker_bomb = 2 # 小王炸
+    red_joker_bomb   = 3 # 大王炸
+    straight         = 4 # 顺子
+    straight_pairs   = 5 # 连对
+    straight_triples = 6 # 连三张
+    flight           = 7 # 飞机
+    single           = 8 # 单牌
+    pair             = 9 # 对子
+    triple           = 10 # 三张
+    triple_pair      = 11 # 三对子
 
 
 # 尝试凑牌

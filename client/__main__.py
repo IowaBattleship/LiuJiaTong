@@ -15,10 +15,14 @@ import socket
 import struct
 import time
 import argparse
-from interface import main_interface, game_over_interface, waiting_hall_interface
+from interface import main_interface, game_over_interface, waiting_hall_interface, set_interface_type
 from playing_handler import playing
 from terminal_printer import TerminalHandler
 import logger
+import tkinter as tk
+from gui import init_gui
+
+from utils.my_network import send_data_to_socket, recv_data_from_socket
 
 CONFIG_NAME = 'LiuJiaTong.json'
 ASCII_ART = '''
@@ -35,7 +39,7 @@ class Config:
         self.ip = ip
         self.port = port
         self.name = name
-        self.cookie = cookie
+        self.cookie = cookie # 使用cookie实现断线重连
     
     def __eq__(self, other):
         if isinstance(other, Config) is False:
@@ -63,26 +67,27 @@ class Config:
 
 class Client:
     def __init__(self, no_cookie: bool):
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 连接到服务端
 
-        self.config = None # 客户端配置文件
-        self.no_cookie = no_cookie # 禁用cookie恢复
-        self.client_player = 0 # 客户端用户标识
-        self.client_cards = [] # 持有牌
-        self.users_cards = [[] for _ in range(6)] # 所有用户的牌，用于最后游戏结束时展现寻找战犯
-        self.is_player = False  # 玩家/旁观者
-        self.users_name = ["" for _ in range(6)] # 用户名字
-        self.game_over = 0 # 游戏结束标志，非0代表已经结束
-        self.now_score = 0 # 场上的分数
-        self.now_player = 0 # 当前的玩家
-        self.users_cards_num = [0 for _ in range(6)] # 用户牌数
-        self.users_score = [0 for _ in range(6)] # 用户分数
+        self.config             = None                   # 客户端配置文件
+        self.no_cookie          = no_cookie              # 禁用cookie恢复
+        self.client_player      = 0                      # 客户端用户标识
+        self.client_cards       = []                     # 持有牌
+        self.users_cards        = [[] for _ in range(6)] # 所有用户的牌，用于最后游戏结束时展现寻找战犯
+        self.is_player          = False                  # 玩家/旁观者
+        self.users_name         = ["" for _ in range(6)] # 用户名字
+        self.game_over          = 0                      # 游戏结束标志，非0代表已经结束
+        self.now_score          = 0                      # 场上的分数
+        self.now_player         = 0                      # 当前的玩家
+        self.users_cards_num    = [0 for _ in range(6)]  # 用户牌数
+        self.users_score        = [0 for _ in range(6)]  # 用户分数
         self.users_played_cards = [[] for _ in range(6)] # 场上的牌
-        self.head_master = 0 # 头科
-        self.his_now_score = 0 # 历史场上分数，用于判断是否发生了得分
-        self.his_last_player = None # 历史上一个打牌的人，用于判断是否上次发生打牌事件
-        self.is_start = False # 记录是否游戏还在开局
+        self.head_master        = 0                      # 头科
+        self.his_now_score      = 0                      # 历史场上分数，用于判断是否发生了得分
+        self.his_last_player    = None                   # 历史上一个打牌的人，用于判断是否上次发生打牌事件
+        self.is_start           = False                  # 记录是否游戏还在开局, False代表游戏尚未开始
     
+    # 记录日志
     def take_log(self, last_player):
         logger.info(f"----------new round------------")
         logger.info(f"cilent_cards: {self.client_cards}")
@@ -148,63 +153,53 @@ class Client:
         else:
             utils.fatal("连接失败")
 
+    # 关闭客户端
     def close(self):
         self.client.close()
     
-    def send_data(self, data):
-        data = json.dumps(data).encode()
-        header = struct.pack('i', len(data))
-        self.client.sendall(header)
-        self.client.sendall(data)
-    
-    def recv_data(self):
-        HEADER_LEN = 4
-        header = self.client.recv(HEADER_LEN)
-        header = struct.unpack('i', header)[0]
-        data = self.client.recv(header)
-        data = json.loads(data.decode())
-        return data
+    # 11/03/2024: 把网络相关代码移动到MyNetwork.py中了
 
     def send_user_info(self):
         # 发送本地的cookie信息
         logger.info(f"Client coockie {self.config.cookie}")
         if self.no_cookie:
             logger.info("Disable cookie")
-            self.send_data(False)
+            send_data_to_socket(False, self.client)
         elif self.config.cookie is not None and isinstance(self.config.cookie, str):
-            self.send_data(True)
-            self.send_data(self.config.cookie)
+            send_data_to_socket(True, self.client)
+            send_data_to_socket(self.config.cookie, self.client)
         else:
-            self.send_data(False)
+            send_data_to_socket(False, self.client)
+            
         # 服务端判断cookie是否合法，如果不合法重发cookie
         # 重发cookie的同时还得同步用户名
-        if_valid_cookie = self.recv_data()
+        if_valid_cookie = recv_data_from_socket(self.client)
         if if_valid_cookie:
             utils.success("cookie合法，开始恢复")
-            if_recovery = self.recv_data()
+            if_recovery = recv_data_from_socket(self.client)
             if if_recovery is False:
                 raise RuntimeError("恢复失败，是不是有客户端还在运行？")
         else:
-            self.send_data(self.config.name)
-            self.config.update_cookie(self.recv_data())
+            send_data_to_socket(self.config.name, self.client)
+            self.config.update_cookie(recv_data_from_socket(self.client))
             logger.info(f"cookie invalid, new cookie {self.config.cookie}")
     
     # 接收等待大厅信息
     def recv_waiting_hall_info(self):
         th = TerminalHandler()
         while True:
-            self.users_name = self.recv_data()
+            self.users_name = recv_data_from_socket(self.client)
             # 收集用户在线/离线信息
-            users_error = self.recv_data()
+            users_error = recv_data_from_socket(self.client)
             waiting_hall_interface(th, self.users_name, users_error)
             if len(self.users_name) == 6:
                 break
 
     # 接收用户信息
     def recv_field_info(self):
-        self.is_player = self.recv_data()
-        self.users_name = self.recv_data()
-        self.client_player = self.recv_data()
+        self.is_player = recv_data_from_socket(self.client)
+        self.users_name = recv_data_from_socket(self.client)
+        self.client_player = recv_data_from_socket(self.client)
 
         logger.info(f"is_player: {self.is_player}")
         logger.info(f"users_name: {self.users_name}")
@@ -212,25 +207,25 @@ class Client:
 
     # 接收场上信息
     def recv_round_info(self):
-        self.game_over = self.recv_data()
-        self.users_score = self.recv_data()
-        self.users_cards_num = self.recv_data()
-        self.users_played_cards = self.recv_data()
+        self.game_over = recv_data_from_socket(self.client)
+        self.users_score = recv_data_from_socket(self.client)
+        self.users_cards_num = recv_data_from_socket(self.client)
+        self.users_played_cards = recv_data_from_socket(self.client)
         if self.game_over != 0:
-            self.users_cards = self.recv_data()
-        self.client_cards = self.recv_data()
-        self.now_score = self.recv_data()
-        self.now_player = self.recv_data()
-        self.head_master = self.recv_data()
+            self.users_cards = recv_data_from_socket(self.client)
+        self.client_cards = recv_data_from_socket(self.client)
+        self.now_score = recv_data_from_socket(self.client)
+        self.now_player = recv_data_from_socket(self.client)
+        self.head_master = recv_data_from_socket(self.client)
 
     # 向server发送打出牌或skip的信息
     def send_player_info(self):
-        self.send_data(self.client_cards)
-        self.send_data(self.users_played_cards[self.client_player])
-        self.send_data(self.now_score)
+        send_data_to_socket(self.client_cards, self.client)
+        send_data_to_socket(self.users_played_cards[self.client_player], self.client)
+        send_data_to_socket(self.now_score, self.client)
 
     def send_playing_heartbeat(self, finished: bool):
-        self.send_data(finished)
+        send_data_to_socket(finished, self.client) 
 
     def handle_connection_error(self, func, msg):
         try:
@@ -241,6 +236,21 @@ class Client:
             utils.fatal(f"{msg}: {e}")
 
     def run(self):
+        """
+        开始游戏
+
+        1. 首先尝试与服务器进行连接
+        2. 服务器返回当前等待大厅信息
+        3. 服务器返回当前场上信息
+        4. 游戏开始
+        5. 客户端轮询地在等待大厅中等待
+        6. 如果是玩家，轮到自己出牌
+        7. 如果是旁观者，直接显示牌局
+        8. 如果游戏结束，显示游戏结果
+
+        :return:
+        """
+        pass
         self.handle_connection_error(self.send_user_info, "在注册时与服务器的链接失效")
         print(ASCII_ART)
         self.handle_connection_error(self.recv_waiting_hall_info, "在游戏时与服务器链接失效(等待大厅)")
@@ -256,6 +266,8 @@ class Client:
             # 要不然会触发出牌的效果音(如果历史中最后打牌的人与当前判断最后打牌的人一致视为过牌，否则视为打牌)
             if last_player == self.now_player and last_player != self.his_last_player:
                 self.his_last_player = last_player
+
+            # 用户界面
             main_interface(
                 # 客户端变量
                 self.is_start, self.is_player, self.client_cards, self.client_player,
@@ -268,16 +280,19 @@ class Client:
                 self.his_now_score, self.his_last_player 
             )
             self.take_log(last_player)
+
             # 记录历史信息
             self.his_now_score = self.now_score
             self.his_last_player = last_player if last_player != self.now_player else None
             self.is_start = True
+
             # 游戏结束
             if self.game_over != 0:
                 logger.info(f"game_over: {self.game_over}")
                 logger.info(f"users_cards: {self.users_cards}")
                 game_over_interface(self.client_player, self.game_over)
                 break
+
             # 轮到出牌
             if self.is_player and self.client_player == self.now_player:
                 def player_playing_cards():
@@ -300,13 +315,23 @@ if __name__ == '__main__':
     parser.add_argument('--ip', type=str, help='ip address')
     parser.add_argument('--port', type=int, help='port')
     parser.add_argument('--user-name', type=str, help='user name')
+    parser.add_argument('--mode', type=str, default="CLI", help='mode')
     parser.add_argument('-n', '--no-cookie', action='store_true', default=False, help='disable cookies')
     args = parser.parse_args()
 
     logger.init_logger()
-    utils.register_signal_handler(ctrl_c_handler)
 
+    utils.register_signal_handler(ctrl_c_handler)
     client = Client(args.no_cookie)
+
+    # 11/02/2024: 增加GUI模式
+    if args.mode == "GUI":
+        logger.info("启动GUI模式")
+        set_interface_type("GUI")
+        init_gui()
+    else:
+        logger.info("启动命令行模式")
+
     if args.ip == None or args.port == None or args.user_name == None:
         client.load_config()
     else:
