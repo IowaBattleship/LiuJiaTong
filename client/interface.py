@@ -123,10 +123,11 @@ def gen_score_chapter(
 def gen_cards_string(cards: list[str]) -> str:
     string = ''
     for i in range(len(cards)):
+        # 11/03/2024: 支持花色
         # 不同的牌之间用空格隔开
-        if i != 0 and cards[i] != cards[i - 1]:
+        if i != 0 and cards[i].value != cards[i - 1].value:
             string += ' '
-        string += cards[i]
+        string += cards[i].value
     return string
 
 def gen_player_field_paragraph(
