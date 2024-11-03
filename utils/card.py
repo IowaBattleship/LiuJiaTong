@@ -13,6 +13,13 @@ class Card:
         self.suit = suit # 花色
         self.value = value # 牌面
 
+    def __lt__(self, other):
+        # 确保比较的是Card对象
+        if not isinstance(other, Card):
+            return NotImplemented
+        
+        return self.value < other.value
+    
     @classmethod
     def from_dict(cls, card_dict):
         return cls(Suits(card_dict['suit']), card_dict['value'])
