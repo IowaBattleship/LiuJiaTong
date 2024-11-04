@@ -5,6 +5,8 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from client.playingrules import *
+import unittest
+from card import Card, Suits
 
 @pytest.mark.parametrize('user_input, expect', [
     [[15,15,15,15], (CardType.normal_bomb, 15)],
@@ -32,3 +34,34 @@ def test_judge_and_transform_cards(user_input, expect):
 ])
 def test_if_input_legal(user_input, user_card, last_played_cards, expect):
     assert if_input_legal(user_input, user_card, last_played_cards) == expect
+
+class TestPlayingRules(unittest.TestCase):
+    def test_if_enough_card_valid(self):
+        user_card = [Card(Suits.heart, 4), Card(Suits.spade, 5), Card(Suits.diamond, 5),
+                     Card(Suits.heart, 6), Card(Suits.heart, 7), Card(Suits.heart, 8)]
+        
+        user_input = [4, 5, 6, 7, 8]
+        _if_enough, score = if_enough_card(user_input, user_card)
+        self.assertTrue(_if_enough)
+        self.assertEqual(score, 5)
+
+    def test_if_enough_card_invalid_missing_card(self):
+        user_card = [Card(Suits.heart, 4), Card(Suits.spade, 5), Card(Suits.diamond, 5),
+                     Card(Suits.heart, 6), Card(Suits.heart, 7), Card(Suits.heart, 8)]
+        
+        user_input = [9]
+        _if_enough, score = if_enough_card(user_input, user_card)
+        self.assertFalse(_if_enough)
+        self.assertEqual(score, 0)
+
+    def test_if_enough_card_invalid_card_number_exceed(self):
+        user_card = [Card(Suits.heart, 4), Card(Suits.spade, 5), Card(Suits.diamond, 5),
+                     Card(Suits.heart, 6), Card(Suits.heart, 7), Card(Suits.heart, 8)]
+        
+        user_input = [4, 4]
+        _if_enough, score = if_enough_card(user_input, user_card)
+        self.assertFalse(_if_enough)
+        self.assertEqual(score, 0)
+
+if __name__ == '__main__':
+    unittest.main()

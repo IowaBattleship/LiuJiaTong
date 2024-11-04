@@ -184,9 +184,9 @@ class Client:
 
     # 向server发送打出牌或skip的信息
     def send_player_info(self):
-        send_data_to_socket(self.client_cards, self.client)
-        send_data_to_socket(self.users_played_cards[self.client_player], self.client)
-        send_data_to_socket(self.now_score, self.client)
+        send_data_to_socket(self.client_cards, self.client) # 发送用户手牌
+        send_data_to_socket(self.users_played_cards[self.client_player], self.client) # 发送自己出的牌
+        send_data_to_socket(self.now_score, self.client) # 发送场上分数
 
     def send_playing_heartbeat(self, finished: bool):
         send_data_to_socket(finished, self.client) 
@@ -260,13 +260,23 @@ class Client:
             # 轮到出牌
             if self.is_player and self.client_player == self.now_player:
                 def player_playing_cards():
-                    new_played_cards, new_score = playing(self.client_cards, last_player, 
-                                self.client_player, self.users_played_cards, self)
-                    new_played_cards.sort(key = lambda x: x.value)
-                    self.users_played_cards[self.client_player] = new_played_cards
+                    # 获取用户输入
+                    new_played_cards, new_score = playing(
+                        self.client_cards, 
+                        last_player, 
+                        self.client_player,
+                        self.users_played_cards,
+                        self
+                    )
+                    new_played_cards.sort(key = lambda x: x.value) # 排序
+
+                    # 更新本地数据
+                    self.users_played_cards[self.client_player] = new_played_cards # 更新玩家打出的牌
                     if new_played_cards != ['F']:
                         for card in new_played_cards:
-                            self.client_cards.remove(card)
-                    self.now_score += new_score
-                    self.send_player_info()
+                            self.client_cards.remove(card) # 更新剩余手牌
+                    self.now_score += new_score # 更新场上分数
+
+                    # 更新服务端数据
+                    self.send_player_info() # 将数据发送给服务器
                 self.handle_connection_error(player_playing_cards, "在游戏时与服务器链接失效(用户打牌)")

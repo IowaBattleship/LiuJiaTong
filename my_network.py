@@ -21,6 +21,7 @@ def recv_data_from_socket(socket: socket):
     header = struct.unpack('i', header)[0]
     data = socket.recv(header)
     # data = json.loads(data.decode())
+    # pickle的问题是一个经典问题，就是接收方得有对应的数据类型才能解析数据
     data = pickle.loads(data) # 11/03/2024: 使用pickle以支持自定义类的序列化
     return data
 
