@@ -5,7 +5,7 @@ class Suits(Enum): # 花色
     heart   = "heart" # 红心
     club    = "club" # 梅花
     diamond = "diamond" # 方块
-    empty   = "joker" # 空，大小王没有花色
+    empty   = "" # 空，大小王没有花色
 
 class Card:
     # 3~10为数字牌, 11~13为JQK, 14为2, 15为小王, 16为大王
