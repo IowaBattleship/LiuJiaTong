@@ -286,7 +286,7 @@ def if_triple_pair(cards, card_num, type_num, joker_num):
 
 # 判断出牌类型并转换大小王，确认关键牌, 返回（出牌类型，关键牌）
 def judge_and_transform_cards(cards: list[int]) -> tuple[CardType, int]:
-    assert sorted(cards, reverse=True) == cards, cards
+    assert sorted(cards, reverse=True) == cards, cards # 输入的cards必须是排好序的
     card_num = dict(Counter(cards))  # 统计每种牌有多少张
     type_num = dict(Counter([v for k, v in card_num.items() if k <= 15]))  # 统计除去王牌 相同张数的牌有多少种
 
@@ -342,11 +342,8 @@ def judge_and_transform_cards(cards: list[int]) -> tuple[CardType, int]:
 
 # 判断为首个出牌时，输入是否合法
 def first_input_legal(user_input: list[int]) -> bool:
-    type_card, key_card = judge_and_transform_cards(user_input)
-    if type_card is not CardType.illegal_type:
-        return True
-    return False
-
+    card_type, _ = judge_and_transform_cards(user_input)
+    return card_type is not CardType.illegal_type
 
 # 判断存在上家出牌时，输入是否合法
 def if_not_first_input_legal(user_input, last_played_cards):
@@ -404,22 +401,21 @@ def if_enough_card(user_input: list[int], user_card: list[Card]) -> tuple[bool, 
     return True, scores
 
 
-# 判断输入是否合法，若合法，返回重新排列后的输入
+# 判断用户从控制台的输入是否合法，若合法，返回重新排列后的输入
 def if_input_legal(
     user_input: list[int], # 用户输入
     user_card: list[Card], # 用户手牌
     last_played_cards: list[Card] # 上家出的牌
-):
+) -> tuple[bool, int]:
     assert user_input is not None
     # 判断输入字符是否合法，并判断是否skip
     for x in user_input:
-        if x < 0 or (len(user_input) > 1 and x == 0): # 小于0或者夹杂了跳过，都是非法输出
+        if x < 0 or (len(user_input) > 1 and x == 0): # 小于0或者夹杂了跳过，都是非法输入
             return False, 0
     
     # 用户跳过
     if user_input == [0]:
         return last_played_cards is not None, 0
-
 
     _if_enough, score = if_enough_card(user_input, user_card)
     if _if_enough is False:

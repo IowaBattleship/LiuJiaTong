@@ -63,5 +63,15 @@ class TestPlayingRules(unittest.TestCase):
         self.assertFalse(_if_enough)
         self.assertEqual(score, 0)
 
+class TestUserInput(unittest.TestCase):
+    def test_first_input_legal_valid_input(self):
+        self.assertEqual(first_input_legal([3, 3]), True)
+        self.assertEqual(first_input_legal([3, 3, 3]), True)
+        self.assertEqual(first_input_legal([5, 5]), True)
+
+    def test_first_input_legal_invalid_input(self):
+        self.assertEqual(first_input_legal([4, 3]), False)
+        self.assertEqual(first_input_legal([4, 3, 3]), False)
+
 if __name__ == '__main__':
     unittest.main()
