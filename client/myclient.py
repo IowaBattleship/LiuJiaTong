@@ -54,7 +54,7 @@ class Client:
     # 记录日志
     def take_log(self, last_player):
         logger.info(f"----------new round------------")
-        logger.info(f"cilent_cards: {self.client_cards}")
+        self.log_client_cards()
         logger.info(f"users_score: {self.users_score}")
         logger.info(f"users_cards_num: {self.users_cards_num}")
         logger.info(f"users_played_cards: {self.users_played_cards}")
@@ -64,6 +64,10 @@ class Client:
         logger.info(f"head_master: {self.users_name[self.head_master] if self.head_master != -1 else None}")
         logger.info(f"his_now_score: {self.his_now_score}")
         logger.info(f"his_last_player: {self.his_last_player}")
+
+    def log_client_cards(self):
+        cards_str = [str(c) for c in self.client_cards]
+        logger.info(f"client_cards: {cards_str}")
 
     def load_config(self):
         try:
