@@ -1,6 +1,8 @@
 import os, sys
 import threading
 
+from card import Card
+
 def str_to_int(c=''):
     if '3' <= c <= '9':
         return int(c)
@@ -47,6 +49,36 @@ def int_to_str(x=-1):
     elif x == 0:  # skip this round
         return 'F'
     return '-'
+
+
+def strs_to_ints(cards: list[str]):
+    if cards is None:
+        return None
+    return [str_to_int(c) for c in cards]
+
+
+def cards_to_ints(cards: list[Card]):
+    if cards is None:
+        return None
+    # 检查数据类型
+    for c in cards:
+        if not isinstance(c, Card):
+            raise TypeError('cards must be Card type')
+    return [c.value for c in cards]
+
+
+def draw_cards(cards: list[Card], targets: list[str]) -> list[Card]:
+    # 双指针遍历cards和targets，找到value与targets中int值相同的card
+    result = []
+    i, j = 0, 0
+    while i < len(cards) and j < len(targets):
+        if cards[i].value == str_to_int(targets[j]):
+            result.append(cards[i])
+            i += 1
+            j += 1
+        else:
+            i += 1
+    return result
 
 
 # 返回上一位出牌玩家下标

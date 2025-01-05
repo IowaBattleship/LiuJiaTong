@@ -78,20 +78,20 @@ class GameStateMachine(ABC):
     def __init__(self):
         self.state = GameState.init
         self.__state_function_set = {
-            GameState.game_start: self.game_start,
-            GameState.game_over: self.game_over,
-            GameState.onlooker_register: self.onlooker_register,
-            GameState.next_turn: self.next_turn,
+            GameState.game_start            : self.game_start,
+            GameState.game_over             : self.game_over,
+            GameState.onlooker_register     : self.onlooker_register,
+            GameState.next_turn             : self.next_turn,
             GameState.send_waiting_hall_info: self.send_waiting_hall_info,
-            GameState.send_field_info: self.send_field_info,
-            GameState.send_round_info: self.send_round_info,
-            GameState.recv_player_info: self.recv_player_info,
-            GameState.init_sync: self.init_sync,
-            GameState.onlooker_sync: self.onlooker_sync,
-            GameState.game_start_sync: self.game_start_sync,
-            GameState.send_round_info_sync: self.send_round_info_sync,
-            GameState.recv_player_info_sync: self.recv_player_info_sync,
-            GameState.next_turn_sync: self.next_turn_sync,
+            GameState.send_field_info       : self.send_field_info,
+            GameState.send_round_info       : self.send_round_info,
+            GameState.recv_player_info      : self.recv_player_info,
+            GameState.init_sync             : self.init_sync,
+            GameState.onlooker_sync         : self.onlooker_sync,
+            GameState.game_start_sync       : self.game_start_sync,
+            GameState.send_round_info_sync  : self.send_round_info_sync,
+            GameState.recv_player_info_sync : self.recv_player_info_sync,
+            GameState.next_turn_sync        : self.next_turn_sync,
         }
 
     @abstractmethod

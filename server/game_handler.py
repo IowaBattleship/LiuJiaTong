@@ -1,5 +1,3 @@
-import json
-import struct
 import secrets
 import string
 import logger
@@ -8,6 +6,8 @@ from player import Player
 from onlooker import Onlooker
 from game_vars import gvar
 from socketserver import BaseRequestHandler
+from my_network import recv_data_from_socket, send_data_to_socket
+from card import Card
 
 class Game_Handler(BaseRequestHandler):
     def __init__(self, request, client_address, server):
@@ -22,19 +22,7 @@ class Game_Handler(BaseRequestHandler):
         
         super().__init__(request, client_address, server)
 
-    def send_data(self, data):
-        data = json.dumps(data).encode()
-        header = struct.pack('i', len(data))
-        self.request.sendall(header)
-        self.request.sendall(data)
-    
-    def recv_data(self):
-        HEADER_LEN = 4
-        header = self.request.recv(HEADER_LEN)
-        header = struct.unpack('i', header)[0]
-        data = self.request.recv(header)
-        data = json.loads(data.decode())
-        return data
+    # 11/03/2024: 把send_data和recv_data方法提取到Network文件中去了
 
     def close(self):
         self.request.close()
@@ -53,40 +41,42 @@ class Game_Handler(BaseRequestHandler):
 
     def send_field_info(self):
         # 玩家/旁观者
-        self.send_data(self.is_player)
+        send_data_to_socket(self.is_player, self.request)
         assert len(self.users_name) == 6, self.users_name
-        self.send_data(self.users_name)
-        self.send_data(self.client_player)
+        send_data_to_socket(self.users_name, self.request)
+        send_data_to_socket(self.client_player, self.request)
     
     def send_round_info(self):
         assert gvar.game_lock.locked()
-        self.send_data(gvar.game_over)
-        self.send_data(gvar.users_score)
-        # 用户手牌数
-        self.send_data([len(x) for x in gvar.users_cards])
-        self.send_data(gvar.users_played_cards)
-        if gvar.game_over != 0:
-            self.send_data(gvar.users_cards)
-        # 当前用户手牌
-        self.send_data(gvar.users_cards[self.client_player])
-        self.send_data(gvar.now_score)
-        self.send_data(gvar.now_player)
-        self.send_data(gvar.head_master)
+        send_data_to_socket(gvar.game_over, self.request)
+        send_data_to_socket(gvar.users_score, self.request)
 
-    def recv_player_reply(self):
-        user_cards = self.recv_data()
-        user_played_cards = self.recv_data()
-        now_score = self.recv_data()
+        # 用户手牌数
+        send_data_to_socket([len(cards) for cards in gvar.users_cards], self.request) # 更新用户手牌数
+        send_data_to_socket(gvar.users_played_cards, self.request) # 更新场上出的牌
+        if gvar.game_over != 0:
+            send_data_to_socket(gvar.users_cards, self.request)
+
+        # 当前用户手牌
+        send_data_to_socket(gvar.users_cards[self.client_player], self.request)
+        send_data_to_socket(gvar.now_score, self.request)
+        send_data_to_socket(gvar.now_player, self.request)
+        send_data_to_socket(gvar.head_master, self.request)
+
+    def recv_player_reply(self) -> tuple[list[Card], list[Card], int]:
+        user_cards = recv_data_from_socket(self.request)
+        user_played_cards = recv_data_from_socket(self.request)
+        now_score = recv_data_from_socket(self.request)
         return user_cards, user_played_cards, now_score
 
     def recv_playing_heartbeat(self):
-        finished = self.recv_data()
+        finished = recv_data_from_socket(self.request)
         assert isinstance(finished, bool), finished
         return finished
     
     def send_waiting_hall_info(self):
-        self.send_data(self.users_name)
-        self.send_data(self.users_error)
+        send_data_to_socket(self.users_name, self.request)
+        send_data_to_socket(self.users_error, self.request)
     
     def generate_cookie(self, length=8):
         # 可以使用的字符集合
@@ -97,23 +87,25 @@ class Game_Handler(BaseRequestHandler):
 
     def recv_user_info(self):
         assert gvar.users_info_lock.locked()
+        logger.info(f"{self.pid} waiting for user info")
         try:
-            if_has_cookie = self.recv_data()
+            if_has_cookie = recv_data_from_socket(self.request)
+            logger.info(f"if_has_cookie: {if_has_cookie}")
             if if_has_cookie:
-                self.user_cookie = self.recv_data()
+                self.user_cookie = recv_data_from_socket(self.request)
                 self.client_player = gvar.users_cookie.get(self.user_cookie)
             else:
                 self.client_player = None
             # cookie是否合法
             if self.client_player is None:
-                self.send_data(False)
+                send_data_to_socket(False, self.request)
                 # 不合法当做正常的玩家加入
                 user_idx = gvar.users_num
-                user_name = self.recv_data()
+                user_name = recv_data_from_socket(self.request)
                 if user_idx == 6:
                     self.is_player = False
                     self.client_player = secrets.randbelow(6)
-                    self.send_data(None)
+                    send_data_to_socket(None, self.request)
                     utils.success(f"Onlooker {user_name}({self.pid}) joined game -> player: {self.client_player}")
                 else:
                     self.is_player = True
@@ -122,7 +114,7 @@ class Game_Handler(BaseRequestHandler):
                     self.user_cookie = self.generate_cookie()
                     while gvar.users_cookie.get(self.user_cookie) is not None:
                         self.user_cookie = self.generate_cookie()
-                    self.send_data(self.user_cookie)
+                    send_data_to_socket(self.user_cookie, self.request)
                     utils.success(f"Player {user_name}({self.client_player}, {self.pid}) joined game -> cookie: {self.user_cookie}")
                     logger.info(f"{user_name}({self.client_player}, {self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
@@ -133,11 +125,11 @@ class Game_Handler(BaseRequestHandler):
                     gvar.users_cookie[self.user_cookie] = self.client_player
             else:
                 # 发送合法标识，并尝试恢复
-                self.send_data(True)
+                send_data_to_socket(True, self.request)
                 self.is_player = True
                 assert 0 <= self.client_player and self.client_player < 6, self.client_player
                 if gvar.users_error[self.client_player]:
-                    self.send_data(True)
+                    send_data_to_socket(True, self.request)
                     # 修改是放在最后的，防止中间出现任何的网络通信失败
                     self.his_state = gvar.users_his_state[self.client_player]
                     gvar.users_error[self.client_player] = False
@@ -145,10 +137,10 @@ class Game_Handler(BaseRequestHandler):
                     gvar.users_info[self.client_player] = (user_name, self.pid)
                     utils.success(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
                 else:
-                    self.send_data(False)
+                    send_data_to_socket(False, self.request)
                     raise RuntimeError("Recover failed because user is playing")
         except Exception as e:
-            utils.error(f"{self.pid} error recieving user info: {e}")
+            utils.error(f"{self.pid} error receiving user info: {e}") # 11/03/2024: Fix typo
             return False
         else:
             return True

@@ -1,6 +1,14 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from game_handler import Game_Handler
+from manager import Manager
+import logger
+import threading
+import argparse
+import threading
+from my_network import ReusableTCPServer
 import utils
 utils.check_packages({
     "nt": [
@@ -8,13 +16,6 @@ utils.check_packages({
         ("win32con", "pypiwin32"),
     ],
 })
-from socketserver import ThreadingTCPServer
-from game_handler import Game_Handler
-from manager import Manager
-import logger
-import threading
-import argparse
-import threading
 
 manager_barrier = threading.Barrier(2)
 def manager_thread(static_user_order):
@@ -29,10 +30,6 @@ def ctrl_c_handler():
     with ctrl_c_handler_lock:
         if utils.user_confirm(prompt="是否强退服务端？",default=False) is True:
             utils.fatal("Keyboard Interrupt")
-
-class ReusableTCPServer(ThreadingTCPServer):
-    allow_reuse_address = True
-    allow_reuse_port = True
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统服务端')

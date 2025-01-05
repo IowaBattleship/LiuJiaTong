@@ -3,6 +3,18 @@ from playingrules import judge_and_transform_cards, CardType
 from terminal_printer import *
 import utils
 import copy
+from card import Card
+
+from gui import update_gui
+
+INTERFACE_TYPE = "CLI" # "CLI" or "GUI", default "CLI"
+
+def set_interface_type(type: str):
+    global INTERFACE_TYPE
+    INTERFACE_TYPE = type
+
+def get_interface_type() -> str:
+    return INTERFACE_TYPE
 
 def gen_paragraph(string: str) -> Paragraph:
     sentence = Sentence()
@@ -108,13 +120,15 @@ def gen_score_chapter(
 
     return chapter
     
-
-def gen_cards_string(cards):
+# 生成手牌字符串
+def gen_cards_string(cards: list[str]) -> str:
     string = ''
     for i in range(len(cards)):
-        if i != 0 and cards[i] != cards[i - 1]:
+        # 11/03/2024: 支持花色
+        # 不同的牌之间用空格隔开
+        if i != 0 and cards[i].get_cli_str() != cards[i - 1].get_cli_str():
             string += ' '
-        string += cards[i]
+        string += cards[i].get_cli_str()
     return string
 
 def gen_player_field_paragraph(
@@ -204,6 +218,7 @@ def main_interface(
 ):
     # 输出帮助
     help_chapter = gen_help_chapter()
+
     # 输出得分
     score_chapter = gen_score_chapter(now_score, client_player, users_score)
     __users_name = copy.deepcopy(users_name)
@@ -212,6 +227,7 @@ def main_interface(
     name_maxlen = 10
     for i in range(6):
         name_maxlen = max(name_maxlen, columns(__users_name[i]))
+
     # 输出其它玩家
     other_player_chapter = []
     client_player_chapter = []
@@ -256,13 +272,35 @@ def main_interface(
         client_player_chapter,
         cards_chapter,
     ]
+
     # 最后的输出
     th = TerminalHandler()
     th.update_max_column(article_columns(article))
-    th.clear_screen_all()
-    th.move_cursor()
-    print_article(article, th)
+    th.clear_screen_all() # 清屏
+    th.move_cursor() # 移动光标
 
+    if INTERFACE_TYPE == "CLI":
+        print_article(article, th) # 打印
+    else:
+        update_gui(client_cards)
+
+    _play_sound(
+        is_start=is_start,
+        last_player=last_player,
+        now_player=now_player,
+        his_last_player=his_last_player,
+        his_now_score=his_now_score,
+        users_played_cards=users_played_cards
+    )
+
+def _play_sound(
+    is_start: bool,
+    last_player: int,
+    now_player: int,
+    his_last_player: int,
+    his_now_score: int,
+    users_played_cards : list[list[Card]],
+):
     # 根据手牌判断播放的音效
     if not is_start:
         playsounds(["start", "open"], True)
@@ -271,7 +309,7 @@ def main_interface(
     elif last_player == his_last_player:
         playsound("pass", True, None)
     else:
-        last_played_cards = [utils.str_to_int(c) for c in users_played_cards[last_player]]
+        last_played_cards = [c.value for c in users_played_cards[last_player]]
         last_played_cards.sort(reverse=True)
         (cardtype, _) = judge_and_transform_cards(last_played_cards)
         assert cardtype != CardType.illegal_type, (last_player, last_played_cards)
@@ -292,7 +330,6 @@ def main_interface(
                 playsound("throw2", True, None)
             else:
                 playsound("throw1", True, None)
-
 
 def game_over_interface(client_player, if_game_over):
     if (client_player + 1) % 2 == (if_game_over + 2) % 2:

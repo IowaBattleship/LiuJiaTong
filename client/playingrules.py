@@ -1,6 +1,8 @@
 import copy
 from collections import Counter
 from enum import Enum
+from card import Card
+import logger
 
 '''
 3 ~ 15 -> 3 ~ 10 + J Q K A 2
@@ -9,18 +11,18 @@ from enum import Enum
 '''
 # 出牌类型
 class CardType(Enum):
-    illegal_type = 0
-    normal_bomb = 1
-    black_joker_bomb = 2
-    red_joker_bomb = 3
-    straight = 4
-    straight_pairs = 5
-    straight_triples = 6
-    flight = 7
-    single = 8
-    pair = 9
-    triple = 10
-    triple_pair = 11
+    illegal_type     = 0 # 非法牌型
+    normal_bomb      = 1 # 普通炸弹
+    black_joker_bomb = 2 # 小王炸
+    red_joker_bomb   = 3 # 大王炸
+    straight         = 4 # 顺子
+    straight_pairs   = 5 # 连对
+    straight_triples = 6 # 连三张
+    flight           = 7 # 飞机
+    single           = 8 # 单牌
+    pair             = 9 # 对子
+    triple           = 10 # 三张
+    triple_pair      = 11 # 三对子
 
 
 # 尝试凑牌
@@ -35,8 +37,8 @@ def try_transform_cards(card_num, rg, joker_num, try_num):
     return True
 
 
-# 判断是否为炸弹，返回（出牌类型，关键牌，转换后牌）
-def if_bomb(cards, card_num):
+# 判断是否为炸弹，返回（出牌类型，关键牌）
+def if_bomb(cards: list[int], card_num: dict[int, int]) -> tuple[CardType, int]:
     if len(cards) < 4:
         return CardType.illegal_type, 0
 
@@ -54,8 +56,8 @@ def if_bomb(cards, card_num):
     return CardType.illegal_type, 0
 
 
-# 判断是否为顺子，返回（出牌类型，关键牌，转换后牌）
-def if_straight(cards, card_num, type_num, joker_num):
+# 判断是否为顺子，返回（出牌类型，关键牌）
+def if_straight(cards: list[int], card_num: dict[int, int], type_num, joker_num):
     # 保证为5张牌，且非5单张时有王可替
     if len(cards) != 5 or (type_num.get(1, 0) != 5 and joker_num == 0):
         return CardType.illegal_type, 0
@@ -283,55 +285,55 @@ def if_triple_pair(cards, card_num, type_num, joker_num):
     return CardType.illegal_type, 0
 
 
-# 判断出牌类型并转换大小王，确认关键牌
-def judge_and_transform_cards(cards: list[int]):
-    assert sorted(cards, reverse=True) == cards, cards
+# 判断出牌类型并转换大小王，确认关键牌, 返回（出牌类型，关键牌）
+def judge_and_transform_cards(cards: list[int]) -> tuple[CardType, int]:
+    assert sorted(cards, reverse=True) == cards, cards # 输入的cards必须是排好序的
     card_num = dict(Counter(cards))  # 统计每种牌有多少张
     type_num = dict(Counter([v for k, v in card_num.items() if k <= 15]))  # 统计除去王牌 相同张数的牌有多少种
 
-    # 1 2 3
+    # 炸弹
     card_type, key_card = if_bomb(cards, card_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
     joker_num = card_num.get(16, 0) + card_num.get(17, 0)
 
-    # 8
+    # 单张
     card_type, key_card = if_single(cards)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 9
+    # 对子
     card_type, key_card = if_pair(cards, card_num, type_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 10
+    # 三张
     card_type, key_card = if_triple(cards, card_num, type_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 11
+    # 三带二
     card_type, key_card = if_triple_pair(cards, card_num, type_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 4
+    # 顺子
     card_type, key_card = if_straight(cards, card_num, type_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 5
+    # 连对
     card_type, key_card = if_straight_pairs(cards, card_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 6
+    # 连三张
     card_type, key_card = if_straight_triples(cards, card_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
 
-    # 7
+    # 飞机
     card_type, key_card = if_flight(cards, card_num, joker_num)
     if card_type is not CardType.illegal_type:
         return card_type, key_card
@@ -340,15 +342,12 @@ def judge_and_transform_cards(cards: list[int]):
 
 
 # 判断为首个出牌时，输入是否合法
-def if_first_input_legal(user_input: list[int]):
-    type_card, key_card = judge_and_transform_cards(user_input)
-    if type_card is not CardType.illegal_type:
-        return True
-    return False
-
+def first_input_legal(user_input: list[int]) -> bool:
+    card_type, _ = judge_and_transform_cards(user_input)
+    return card_type is not CardType.illegal_type
 
 # 判断存在上家出牌时，输入是否合法
-def if_not_first_input_legal(user_input, last_played_cards):
+def if_not_first_input_legal(user_input: list[int], last_played_cards: list[int]):
     card_len = len(user_input)
     last_card_len = len(last_played_cards)
     type_card, key_card = judge_and_transform_cards(user_input)
@@ -390,27 +389,33 @@ def if_not_first_input_legal(user_input, last_played_cards):
 
 
 # 判断手中牌是否足够出，并返回输入牌的分数
-def if_enough_card(user_input, user_card):
+def if_enough_card(user_input: list[int], user_card: list[Card]) -> tuple[bool, int]:
+    logger.info(f"if_enough_card: {user_input}")
     input_num = dict(Counter(user_input))  # 统计每种牌有多少张
     if user_card is not None:
-        card_num = dict(Counter(user_card))
+        # 统计 user_card 中每种牌的数量
+        # 11/04/2024: 支持Card类
+        card_num = dict(Counter([card.value for card in user_card]))
         for k, v in input_num.items():
             if card_num.get(k, 0) < v:
                 return False, 0
-    return True, input_num.get(5, 0) * 5 + (input_num.get(10, 0) + input_num.get(13, 0)) * 10
+    scores = input_num.get(5, 0) * 5 + (input_num.get(10, 0) + input_num.get(13, 0)) * 10 # 计算分数
+    return True, scores
 
 
-# 判断输入是否合法，若合法，返回重新排列后的输入
-def if_input_legal(
-    user_input: list[int],
-    user_card: list[int],
-    last_played_cards: list[int]
-):
+# 判断用户从控制台的输入是否合法，若合法，返回重新排列后的输入
+def validate_user_input(
+    user_input       : list[int],  # 用户输入
+    user_card        : list[Card], # 用户手牌
+    last_played_cards: list[Card]  # 上家出的牌
+) -> tuple[bool, int]:
     assert user_input is not None
     # 判断输入字符是否合法，并判断是否skip
     for x in user_input:
-        if x < 0 or (len(user_input) > 1 and x == 0):
+        if x < 0 or (len(user_input) > 1 and x == 0): # 小于0或者夹杂了跳过，都是非法输入
             return False, 0
+    
+    # 用户跳过
     if user_input == [0]:
         return last_played_cards is not None, 0
 
@@ -420,7 +425,8 @@ def if_input_legal(
 
     _user_input = sorted(user_input, reverse=True)
     if last_played_cards is None:
-        return if_first_input_legal(_user_input), score
+        return first_input_legal(_user_input), score
     else:
-        _last_played_cards = sorted(last_played_cards, reverse=True)
+        last_played_cards_values = [last_card.value for last_card in last_played_cards]
+        _last_played_cards = sorted(last_played_cards_values, reverse=True)
         return if_not_first_input_legal(_user_input, _last_played_cards), score
