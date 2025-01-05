@@ -71,6 +71,7 @@ class Game_Handler(BaseRequestHandler):
     def recv_playing_heartbeat(self):
         print("Trying to receive heartbeat...")
         finished = recv_data_from_socket(self.request)
+        print(f"Received heartbeat: {finished}")
         assert isinstance(finished, bool), finished
         return finished
     
