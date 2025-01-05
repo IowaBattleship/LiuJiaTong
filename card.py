@@ -116,6 +116,8 @@ def generate_cards() -> list[Card]:
         # 洗入普通牌
         for value in range(3, 16): # 3~15
             for suit in Suits: # 4种花色
+                if suit == Suits.empty:
+                    continue
                 cards.append(Card(suit, value))
         
         # 洗入大小王
