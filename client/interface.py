@@ -3,6 +3,7 @@ from playingrules import judge_and_transform_cards, CardType
 from terminal_printer import *
 import utils
 import copy
+from card import Card
 
 from gui import update_gui
 
@@ -298,7 +299,7 @@ def _play_sound(
     now_player: int,
     his_last_player: int,
     his_now_score: int,
-    users_played_cards
+    users_played_cards : list[list[Card]],
 ):
     # 根据手牌判断播放的音效
     if not is_start:
@@ -308,7 +309,7 @@ def _play_sound(
     elif last_player == his_last_player:
         playsound("pass", True, None)
     else:
-        last_played_cards = [utils.str_to_int(c) for c in users_played_cards[last_player]]
+        last_played_cards = [c.value for c in users_played_cards[last_player]]
         last_played_cards.sort(reverse=True)
         (cardtype, _) = judge_and_transform_cards(last_played_cards)
         assert cardtype != CardType.illegal_type, (last_player, last_played_cards)

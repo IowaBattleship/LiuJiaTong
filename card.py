@@ -13,12 +13,69 @@ class Card:
         self.suit  = suit  # 花色
         self.value = value # 牌面
 
-    def __lt__(self, other):
-        # 确保比较的是Card对象
-        if not isinstance(other, Card):
-            return NotImplemented
+    # def __le__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value <= other.value
+    #     if isinstance(other, int):
+    #         return self.value <= other
         
-        return self.value < other.value
+    #     return NotImplemented
+    
+    # def __ge__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value >= other.value
+    #     if isinstance(other, int):
+    #         return self.value >= other
+        
+    #     return NotImplemented
+    def __lt__(self, other):
+        # 确保比较的是Card对象或者int
+        if isinstance(other, Card):
+            return self.value < other.value
+        if isinstance(other, int):
+            return self.value < other
+        
+        return NotImplemented
+    
+    # def __gt__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value > other.value
+    #     if isinstance(other, int):
+    #         return self.value > other
+        
+    #     return NotImplemented
+    
+    # def __eq__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value == other.value
+    #     if isinstance(other, int):
+    #         return self.value == other
+        
+    #     return NotImplemented
+    
+    # def __ne__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value != other.value
+    #     if isinstance(other, int):
+    #         return self.value != other
+        
+    #     return NotImplemented
+    
+    # # 减法
+    # def __sub__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value - other.value
+    #     if isinstance(other, int):
+    #         return self.value - other
+        
+    # def __add__(self, other):
+    #     if isinstance(other, Card):
+    #         return self.value + other.value
+    #     if isinstance(other, int):
+    #         return self.value + other
+    
+    # def __hash__(self):
+    #     return hash((self.suit, self.value))
     
     def __str__(self):
         return f"{self.suit}_{self.get_cli_str()}"
@@ -33,11 +90,21 @@ class Card:
     
     # 用于在 CLI 中显示
     def get_cli_str(self):
-        if self.value == 14:
-            return "2"
+        if self.value == 10:
+            return "B"
+        elif self.value == 11:
+            return "J"
+        elif self.value == 12:
+            return "Q"
+        elif self.value == 13:
+            return "K"
+        elif self.value == 14:
+            return "A"
         elif self.value == 15:
-            return "0"
+            return "2"
         elif self.value == 16:
+            return "0"
+        elif self.value == 17:
             return "1"
         else:
             return str(self.value)
@@ -45,14 +112,14 @@ class Card:
 def generate_cards() -> list[Card]:
     cards = []
 
-    for i in range(4): # 六家统使用四副牌
+    for _ in range(4): # 六家统使用四副牌
         # 洗入普通牌
-        for value in range(3, 15): # 3~14
+        for value in range(3, 16): # 3~15
             for suit in Suits: # 4种花色
                 cards.append(Card(suit, value))
         
         # 洗入大小王
-        for value in range(15, 17): # 15~16
+        for value in range(16, 18): # 16~17
             cards.append(Card(Suits.empty, value))
     return cards
 

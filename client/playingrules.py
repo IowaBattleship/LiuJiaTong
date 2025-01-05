@@ -37,8 +37,8 @@ def try_transform_cards(card_num, rg, joker_num, try_num):
     return True
 
 
-# 判断是否为炸弹，返回（出牌类型，关键牌，转换后牌）
-def if_bomb(cards, card_num):
+# 判断是否为炸弹，返回（出牌类型，关键牌）
+def if_bomb(cards: list[int], card_num: dict[int, int]) -> tuple[CardType, int]:
     if len(cards) < 4:
         return CardType.illegal_type, 0
 
@@ -56,8 +56,8 @@ def if_bomb(cards, card_num):
     return CardType.illegal_type, 0
 
 
-# 判断是否为顺子，返回（出牌类型，关键牌，转换后牌）
-def if_straight(cards, card_num, type_num, joker_num):
+# 判断是否为顺子，返回（出牌类型，关键牌）
+def if_straight(cards: list[int], card_num: dict[int, int], type_num, joker_num):
     # 保证为5张牌，且非5单张时有王可替
     if len(cards) != 5 or (type_num.get(1, 0) != 5 and joker_num == 0):
         return CardType.illegal_type, 0
@@ -343,13 +343,11 @@ def judge_and_transform_cards(cards: list[int]) -> tuple[CardType, int]:
 
 # 判断为首个出牌时，输入是否合法
 def first_input_legal(user_input: list[int]) -> bool:
-    logger.info(f"user_input: {user_input}")
     card_type, _ = judge_and_transform_cards(user_input)
-    logger.info(f"Input leage: {card_type is not CardType.illegal_type}")
     return card_type is not CardType.illegal_type
 
 # 判断存在上家出牌时，输入是否合法
-def if_not_first_input_legal(user_input, last_played_cards):
+def if_not_first_input_legal(user_input: list[int], last_played_cards: list[int]):
     card_len = len(user_input)
     last_card_len = len(last_played_cards)
     type_card, key_card = judge_and_transform_cards(user_input)
@@ -429,5 +427,6 @@ def validate_user_input(
     if last_played_cards is None:
         return first_input_legal(_user_input), score
     else:
-        _last_played_cards = sorted(last_played_cards, reverse=True)
+        last_played_cards_values = [last_card.value for last_card in last_played_cards]
+        _last_played_cards = sorted(last_played_cards_values, reverse=True)
         return if_not_first_input_legal(_user_input, _last_played_cards), score

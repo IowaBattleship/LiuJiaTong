@@ -274,7 +274,7 @@ def playing(
         # 11/03/2024: 支持Card类
         tcp_handler.logger.info(f"New Played: {user_input}")
         tcp_handler.logger.info(f"Client Cards: {client_cards}")
-        tcp_handler.logger.info(f"Last Player: {last_player}. Played: {users_played_cards[last_player] if last_player != client_player else None}")
+        tcp_handler.logger.info(f"Last Player: {last_player}. Played: {[str(c) for c in users_played_cards[last_player]] if last_player != client_player else None}")
         tcp_handler.logger.info(f"Client Player: {client_player}")
         legal_input, new_score = validate_user_input(
             utils.strs_to_ints(user_input),
@@ -291,5 +291,8 @@ def playing(
     
     # 返回用户每种牌的前n张
     # 根据用户输入的字符串，返回用户打出的牌
-    new_played_cards = utils.draw_cards(client_cards, user_input)
+    if user_input == ['F']:
+        new_played_cards = ['F']
+    else:
+        new_played_cards = utils.draw_cards(client_cards, user_input)
     return new_played_cards, new_score

@@ -313,7 +313,8 @@ class Client:
                         self
                     )
                     self.logger.info(f"New played cards: {new_played_cards}")
-                    new_played_cards.sort(key = lambda x: x.value) # 排序
+                    if new_played_cards != ['F']:
+                        new_played_cards.sort(key = lambda x: x.value) # 排序
 
                     # 更新本地数据
                     self.users_played_cards[self.client_player] = new_played_cards # 更新玩家打出的牌
