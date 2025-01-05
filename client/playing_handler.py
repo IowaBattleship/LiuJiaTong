@@ -277,10 +277,10 @@ def playing(
         tcp_handler.logger.info(f"client_cards: {client_cards}")
         tcp_handler.logger.info(f"users_played_cards[last_player]: {users_played_cards[last_player] if last_player != client_player else None}")
         legal_input, new_score = validate_user_input(
-            [utils.str_to_int(c) for c in new_played_cards],
-            [c.value for c in client_cards],
-            [c.value for c in users_played_cards[last_player]]
-                if last_player != client_player and users_played_cards[last_player] != None else None
+            utils.strs_to_ints(new_played_cards),
+            utils.cards_to_ints(client_cards),
+            utils.cards_to_ints(users_played_cards[last_player])
+                if last_player != client_player else None
         )
         if legal_input:
             tcp_handler.logger.info(f"now play: {new_played_cards}")

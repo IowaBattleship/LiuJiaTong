@@ -1,6 +1,8 @@
 import os, sys
 import threading
 
+from card import Card
+
 def str_to_int(c=''):
     if '3' <= c <= '9':
         return int(c)
@@ -47,6 +49,18 @@ def int_to_str(x=-1):
     elif x == 0:  # skip this round
         return 'F'
     return '-'
+
+
+def strs_to_ints(cards: list[str]):
+    if cards is None:
+        return None
+    return [str_to_int(c) for c in cards]
+
+
+def cards_to_ints(cards: list[Card]):
+    if cards is None:
+        return None
+    return [c.value for c in cards]
 
 
 # 返回上一位出牌玩家下标

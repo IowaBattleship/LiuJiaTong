@@ -10,7 +10,7 @@ class Suits(Enum): # 花色
 class Card:
     # 3~10为数字牌, 11~13为JQK, 14为2, 15为小王, 16为大王
     def __init__(self, suit: Suits, value: int):
-        self.suit = suit # 花色
+        self.suit  = suit  # 花色
         self.value = value # 牌面
 
     def __lt__(self, other):
@@ -55,3 +55,8 @@ def generate_cards() -> list[Card]:
         for value in range(15, 17): # 15~16
             cards.append(Card(Suits.empty, value))
     return cards
+
+SPADE_10 = Card(Suits.spade, 10)
+HEART_JACK = Card(Suits.heart, 11)
+CLUB_QUEEN = Card(Suits.club, 12)
+DIAMOND_KING = Card(Suits.diamond, 13)
