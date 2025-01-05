@@ -67,6 +67,24 @@ def cards_to_ints(cards: list[Card]):
     return [c.value for c in cards]
 
 
+def draw_cards(cards: list[Card], target: list[str]) -> list[Card]:
+    return draw_cards(cards, strs_to_ints(target))
+
+
+def draw_cards(cards: list[Card], targets: list[int]) -> list[Card]:
+    # 双指针遍历cards和targets，找到value与targets中int值相同的card
+    result = []
+    i, j = 0, 0
+    while i < len(cards) and j < len(targets):
+        if cards[i].value == targets[j]:
+            result.append(cards[i])
+            i += 1
+            j += 1
+        else:
+            i += 1
+    return result
+
+
 # 返回上一位出牌玩家下标
 def last_played(played_cards, player):
     i = (player - 1 + 6) % 6

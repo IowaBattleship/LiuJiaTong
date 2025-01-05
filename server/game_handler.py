@@ -7,6 +7,7 @@ from onlooker import Onlooker
 from game_vars import gvar
 from socketserver import BaseRequestHandler
 from my_network import recv_data_from_socket, send_data_to_socket
+from card import Card
 
 class Game_Handler(BaseRequestHandler):
     def __init__(self, request, client_address, server):
@@ -62,7 +63,7 @@ class Game_Handler(BaseRequestHandler):
         send_data_to_socket(gvar.now_player, self.request)
         send_data_to_socket(gvar.head_master, self.request)
 
-    def recv_player_reply(self):
+    def recv_player_reply(self) -> tuple[list[Card], list[Card], int]:
         user_cards = recv_data_from_socket(self.request)
         user_played_cards = recv_data_from_socket(self.request)
         now_score = recv_data_from_socket(self.request)

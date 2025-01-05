@@ -20,6 +20,7 @@ from terminal_printer import TerminalHandler
 from my_network import send_data_to_socket, recv_data_from_socket
 from interface import main_interface, game_over_interface, waiting_hall_interface
 from config import Config, CONFIG_NAME
+from card import Card
 
 ASCII_ART = '''
     __    _              ___          ______                 
@@ -32,26 +33,25 @@ ASCII_ART = '''
 
 class Client:
     def __init__(self, no_cookie: bool):
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 连接到服务端
-
-        self.config             = None                   # 客户端配置文件
-        self.no_cookie          = no_cookie              # 禁用cookie恢复
-        self.client_player      = 0                      # 客户端用户标识
-        self.client_cards       = []                     # 持有牌
-        self.users_cards        = [[] for _ in range(6)] # 所有用户的牌，用于最后游戏结束时展现寻找战犯
-        self.is_player          = False                  # 玩家/旁观者
-        self.users_name         = ["" for _ in range(6)] # 用户名字
-        self.game_over          = 0                      # 游戏结束标志，非0代表已经结束
-        self.now_score          = 0                      # 场上的分数
-        self.now_player         = 0                      # 当前的玩家
-        self.users_cards_num    = [0 for _ in range(6)]  # 用户牌数
-        self.users_score        = [0 for _ in range(6)]  # 用户分数
-        self.users_played_cards = [[] for _ in range(6)] # 场上的牌
-        self.head_master        = 0                      # 头科
-        self.his_now_score      = 0                      # 历史场上分数，用于判断是否发生了得分
-        self.his_last_player    = None                   # 历史上一个打牌的人，用于判断是否上次发生打牌事件
-        self.is_start           = False                  # 记录是否游戏还在开局, False代表游戏尚未开始
-        self.logger             = None                   # 日志 01/05/2025: 每个用户都使用自己的looger
+        self.client             : socket           = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 连接到服务端
+        self.config             : Config           = None                   # 客户端配置文件
+        self.no_cookie          : bool             = no_cookie              # 禁用cookie恢复
+        self.client_player      : int              = 0                      # 客户端用户标识
+        self.client_cards       : list[Card]       = []                     # 持有牌
+        self.users_cards        : list[list[Card]] = [[] for _ in range(6)] # 所有用户的牌，用于最后游戏结束时展现寻找战犯
+        self.is_player          : bool             = False                  # 玩家/旁观者
+        self.users_name         : list[str]        = ["" for _ in range(6)] # 用户名字
+        self.game_over          : int              = 0                      # 游戏结束标志，非0代表已经结束
+        self.now_score          : int              = 0                      # 场上的分数
+        self.now_player         : int              = 0                      # 当前的玩家
+        self.users_cards_num    : list[int]        = [0 for _ in range(6)]  # 用户牌数
+        self.users_score        : list[int]        = [0 for _ in range(6)]  # 用户分数
+        self.users_played_cards : list[list[Card]] = [[] for _ in range(6)] # 场上的牌
+        self.head_master        : int              = 0                      # 头科
+        self.his_now_score      : int              = 0                      # 历史场上分数，用于判断是否发生了得分
+        self.his_last_player    : int              = None                   # 历史上一个打牌的人，用于判断是否上次发生打牌事件
+        self.is_start           : bool             = False                  # 记录是否游戏还在开局, False代表游戏尚未开始
+        self.logger             : logging.Logger   = None                   # 日志 01/05/2025: 每个用户都使用自己的looger
     
     # 记录日志
     def take_log(self, last_player):
@@ -312,6 +312,7 @@ class Client:
                         self.users_played_cards,
                         self
                     )
+                    self.logger.info(f"New played cards: {new_played_cards}")
                     new_played_cards.sort(key = lambda x: x.value) # 排序
 
                     # 更新本地数据

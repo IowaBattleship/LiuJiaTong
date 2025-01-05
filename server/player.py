@@ -76,8 +76,10 @@ class Player(GameStateMachine):
                 pass
 
             # 接收客户端发送的玩家信息
-            user_cards, user_played_cards, now_score = \
-                self.tcp_handler.recv_player_reply()
+            user_cards, user_played_cards, now_score = self.tcp_handler.recv_player_reply()
+            logger.info(f"Player {self.pid}({self.client_player}) cards:{user_cards}")
+            logger.info(f"Player {self.pid}({self.client_player}) played cards:{user_played_cards}")
+            logger.info(f"Player {self.pid}({self.client_player}) score:{now_score}")
             
             # 更新游戏状态
             with gvar.game_lock:

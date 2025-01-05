@@ -183,7 +183,6 @@ def get_input():
 
 # 读取用户输入，支持输入方向键，退格键（backspace），回车键（enter），tab键（tab）
 def read_userinput(client_cards: list[Card]) -> list[str]:
-    logger.info("read_userinput")
     th = g_terminal_handler
     while True:
         assert(th.cursor <= len(th.new_played_cards))
@@ -265,29 +264,32 @@ def playing(
     global g_terminal_handler
     g_terminal_handler = PlayingTerminalHandler()
 
-    new_played_cards = []
+    user_input = []
     new_score = 0
 
     tcp_handler.logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
     while True:
-        new_played_cards = read_userinput(client_cards)
+        user_input = read_userinput(client_cards)
 
         # 11/03/2024: 支持Card类
-        tcp_handler.logger.info(f"New Played: {new_played_cards}")
+        tcp_handler.logger.info(f"New Played: {user_input}")
         tcp_handler.logger.info(f"Client Cards: {client_cards}")
         tcp_handler.logger.info(f"Last Player: {last_player}. Played: {users_played_cards[last_player] if last_player != client_player else None}")
         tcp_handler.logger.info(f"Client Player: {client_player}")
         legal_input, new_score = validate_user_input(
-            utils.strs_to_ints(new_played_cards),
+            utils.strs_to_ints(user_input),
             client_cards,
             users_played_cards[last_player] if last_player != client_player else None
         )
         if legal_input:
-            tcp_handler.logger.info(f"Now play: {new_played_cards}")
+            tcp_handler.logger.info(f"Now play: {user_input}")
             tcp_handler.send_playing_heartbeat(finished=True)
             break
-        tcp_handler.logger.info(f"illegal input: {new_played_cards}")
+        tcp_handler.logger.info(f"illegal input: {user_input}")
         g_terminal_handler.err = '(非法牌型)'
         g_terminal_handler.print()
     
+    # 返回用户每种牌的前n张
+    # 根据用户输入的字符串，返回用户打出的牌
+    new_played_cards = utils.draw_cards(client_cards, user_input)
     return new_played_cards, new_score
