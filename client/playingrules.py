@@ -2,6 +2,7 @@ import copy
 from collections import Counter
 from enum import Enum
 from card import Card
+import logger
 
 '''
 3 ~ 15 -> 3 ~ 10 + J Q K A 2
@@ -342,7 +343,9 @@ def judge_and_transform_cards(cards: list[int]) -> tuple[CardType, int]:
 
 # 判断为首个出牌时，输入是否合法
 def first_input_legal(user_input: list[int]) -> bool:
+    logger.info(f"user_input: {user_input}")
     card_type, _ = judge_and_transform_cards(user_input)
+    logger.info(f"Input leage: {card_type is not CardType.illegal_type}")
     return card_type is not CardType.illegal_type
 
 # 判断存在上家出牌时，输入是否合法
@@ -389,6 +392,7 @@ def if_not_first_input_legal(user_input, last_played_cards):
 
 # 判断手中牌是否足够出，并返回输入牌的分数
 def if_enough_card(user_input: list[int], user_card: list[Card]) -> tuple[bool, int]:
+    logger.info(f"if_enough_card: {user_input}")
     input_num = dict(Counter(user_input))  # 统计每种牌有多少张
     if user_card is not None:
         # 统计 user_card 中每种牌的数量
@@ -402,11 +406,12 @@ def if_enough_card(user_input: list[int], user_card: list[Card]) -> tuple[bool, 
 
 
 # 判断用户从控制台的输入是否合法，若合法，返回重新排列后的输入
-def if_input_legal(
+def validate_user_input(
     user_input: list[int], # 用户输入
     user_card: list[Card], # 用户手牌
     last_played_cards: list[Card] # 上家出的牌
 ) -> tuple[bool, int]:
+    logger.info("validate_user_input")
     assert user_input is not None
     # 判断输入字符是否合法，并判断是否skip
     for x in user_input:

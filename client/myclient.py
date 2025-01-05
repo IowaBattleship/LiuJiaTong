@@ -13,6 +13,7 @@ utils.check_packages({
         ("win32con", "pypiwin32"),
     ],
 })
+import logging
 import logger
 from playing_handler import playing
 from terminal_printer import TerminalHandler
@@ -50,6 +51,7 @@ class Client:
         self.his_now_score      = 0                      # 历史场上分数，用于判断是否发生了得分
         self.his_last_player    = None                   # 历史上一个打牌的人，用于判断是否上次发生打牌事件
         self.is_start           = False                  # 记录是否游戏还在开局, False代表游戏尚未开始
+        self.logger             = None                   # 日志 01/05/2025: 每个用户都使用自己的looger
     
     # 记录日志
     def take_log(self, last_player):
@@ -70,6 +72,9 @@ class Client:
         logger.info(f"client_cards: {cards_str}")
 
     def load_config(self):
+        """
+        加载配置文件，并根据配置文件或用户输入初始化配置对象
+        """
         try:
             with open(CONFIG_NAME, "r") as file:
                 data = json.load(file)
@@ -85,10 +90,13 @@ class Client:
                 print(f"IP地址: {self.config.ip}")
                 print(f"端口:   {self.config.port}")
                 print(f"用户名: {self.config.name}")
-                if utils.user_confirm(prompt="是否使用配置？", default=True) is False:
-                    self.config = None
-            if self.config is not None:
-                break
+                if utils.user_confirm(prompt="是否使用配置？", default=True) is True:
+                    # 配置logger
+                    self.init_logger()
+                    break
+
+            # 用户输入配置信息
+            self.config = None
             while True:
                 ip = input(f"请输入IP地址: ")
                 port = input(f"请输入端口: ")
@@ -96,12 +104,43 @@ class Client:
                 try:
                     if self.config != Config(ip, int(port), name):
                         self.config = Config(ip, int(port), name)
+                        self.init_logger()
                 except:
                     print(f"输入有误，请重新输入")
                 else:
                     self.config.dump()
                     print('')
                     break
+
+    def init_logger(self):
+        # 设置输出文件为self.config.name+时间戳.log
+        log_filename = f"{self.config.name}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log"
+        log_filepath = os.path.join(logger.LOGGER_DIR, log_filename)  # 指定日志文件的路径
+        # 检查文件是否存在
+        if os.path.exists(log_filepath):
+            os.remove(log_filepath)
+        # 创建日志文件
+        open(log_filepath, 'w').close()
+
+        # 创建一个日志记录器
+        self.logger = logging.getLogger(self.config.name)
+        self.logger.setLevel(logging.INFO)  # 设置日志级别
+
+        # 创建一个文件处理器，用于将日志写入文件
+        file_handler = logging.FileHandler(log_filepath)
+        file_handler.setLevel(logging.INFO)
+
+        # 定义日志格式
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+
+        # 为日志记录器添加处理器
+        self.logger.addHandler(file_handler)
+
+        # 避免日志消息被多次输出
+        self.logger.propagate = False
+
+        self.logger.info(f"Client logger initialized. Client coockie {self.config.cookie}")
 
     def connect(self, server_ip, server_port):
         if_connected = False
@@ -264,6 +303,7 @@ class Client:
             # 轮到出牌
             if self.is_player and self.client_player == self.now_player:
                 def player_playing_cards():
+                    self.logger.info("player_playing_cards")
                     # 获取用户输入
                     new_played_cards, new_score = playing(
                         self.client_cards, 

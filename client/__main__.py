@@ -48,6 +48,7 @@ if __name__ == '__main__':
         client.load_config()
     else:
         client.config = Config(args.ip, args.port, args.user_name)
+        client.init_logger()
 
     client.connect(client.config.ip, client.config.port)
     utils.disable_echo()

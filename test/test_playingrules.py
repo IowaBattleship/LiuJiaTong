@@ -32,8 +32,8 @@ def test_judge_and_transform_cards(user_input, expect):
     [[4,5,6,7,8,9,13,10,16,17], [4,5,6,7,8,9,9,9,9,9,10,13,14,14,14,15,16,17], None, (False, 25)],
     [[15,15,15,15,15], None, [4,4,4,4,17], (True, 0)],
 ])
-def test_if_input_legal(user_input, user_card, last_played_cards, expect):
-    assert if_input_legal(user_input, user_card, last_played_cards) == expect
+def test_validate_user_input(user_input, user_card, last_played_cards, expect):
+    assert validate_user_input(user_input, user_card, last_played_cards) == expect
 
 class TestPlayingRules(unittest.TestCase):
     def test_if_enough_card_valid(self):

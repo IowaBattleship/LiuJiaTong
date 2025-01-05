@@ -2,9 +2,10 @@ import os
 import sys
 import time
 import logger
+from logging import Logger
 import utils
 from enum import Enum, auto
-from playingrules import if_input_legal
+from playingrules import validate_user_input
 from terminal_printer import *
 import sound
 from card import Card
@@ -181,50 +182,47 @@ def get_input():
     return read_input(if_blocking=True)
 
 # 读取用户输入，支持输入方向键，退格键（backspace），回车键（enter），tab键（tab）
-def read_userinput(client_cards) -> list[str]:
+def read_userinput(client_cards: list[Card]) -> list[str]:
+    logger.info("read_userinput")
     th = g_terminal_handler
     while True:
         assert(th.cursor <= len(th.new_played_cards))
         end_input = False
         try:
             input = get_input()
-            if input == SpecialInput.left_arrow:
+            if input == SpecialInput.left_arrow: # 左移光标
                 if th.cursor > 0:
                     th.cursor -= 1
-            elif input == SpecialInput.right_arrow:
+            elif input == SpecialInput.right_arrow: # 右移光标
                 if th.cursor < len(th.new_played_cards):
                     th.cursor += 1
-            elif input == SpecialInput.backspace:
-                # 删除光标左边的字符
+            elif input == SpecialInput.backspace: # 删除光标左边的字符
                 if th.cursor > 0:
                     th.new_played_cards = th.new_played_cards[:th.cursor - 1] + th.new_played_cards[th.cursor:]
                     th.cursor -= 1
-            elif input in ['\n', '\r']:
-                # 结束输入
+            elif input in ['\n', '\r']: # 结束输入
                 end_input = True
-            elif input == '\t':
-                # 自动补全
+            elif input == '\t': # 自动补全
                 if th.new_played_cards == ['F']:
                     continue
                 if th.cursor > 0:
                     fill_char = th.new_played_cards[th.cursor - 1]
                     used_num = th.new_played_cards.count(fill_char)
-                    total_num = client_cards.count(fill_char)
+                    total_num = get_card_count(client_cards, fill_char)
                     fill_num = total_num - used_num
                     assert (fill_num >= 0)
                     th.new_played_cards = th.new_played_cards[:th.cursor] + fill_num * [fill_char] + th.new_played_cards[th.cursor:]
                     th.cursor += fill_num
-            elif input == 'F':
-                # 跳过回合
+            elif input == 'F': # 跳过回合
                 th.new_played_cards = ['F']
                 th.cursor = 1
-            elif input == 'C':
-                # 清空输入
+            elif input == 'C': # 清空输入
                 th.new_played_cards = []
                 th.cursor = 0
-            else:
-                assert(th.new_played_cards.count(input) <= client_cards.count(input))
-                if th.new_played_cards.count(input) == client_cards.count(input):
+            else: # 输入一张牌
+                user_card_count = get_card_count(client_cards, input)
+                assert(th.new_played_cards.count(input) <= user_card_count)
+                if th.new_played_cards.count(input) == user_card_count:
                     raise InputException('(你打出的牌超过上限了)')
                 if th.new_played_cards == ['F']:
                     th.new_played_cards = []
@@ -242,15 +240,23 @@ def read_userinput(client_cards) -> list[str]:
         assert(th.new_played_cards == ['F'] or th.new_played_cards.count('F') == 0) # 不允许夹杂跳过，避免误输入
     return th.new_played_cards
 
+# 01/04/2024: 支持Card类
+def get_card_count(client_cards: list[Card], card: str) -> int:
+    result = 0
+    for c in client_cards:
+        if c.get_cli_str() == card:
+            result += 1
+    return result
+
 # 从控制台获取用户输入，直到用户输入合法数据
 def playing(
     client_cards      : list[Card], # 用户所持卡牌信息
     last_player       : int,        # 最后打出牌的玩家
     client_player     : int,        # 客户端正在输入的玩家
     users_played_cards: list[Card], # 场上所有牌信息
-    tcp_handler # 客户端句柄，用于检测远端是否关闭了
+    tcp_handler,                    # 客户端句柄，用于检测远端是否关闭了
 ) -> tuple[list[Card], int]:
-    logger.info("playing")
+    tcp_handler.logger.info("playing")
     global g_tcp_handler
     g_tcp_handler = tcp_handler
     reset_user_hang_out()
@@ -262,19 +268,22 @@ def playing(
     new_played_cards = []
     new_score = 0
 
-    logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
+    tcp_handler.logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
     while True:
         new_played_cards = read_userinput(client_cards)
 
         # 11/03/2024: 支持Card类
-        _if_input_legal, new_score = if_input_legal(
+        tcp_handler.logger.info(f"new_played_cards: {new_played_cards}")
+        tcp_handler.logger.info(f"client_cards: {client_cards}")
+        tcp_handler.logger.info(f"users_played_cards[last_player]: {users_played_cards[last_player] if last_player != client_player else None}")
+        legal_input, new_score = validate_user_input(
             [utils.str_to_int(c) for c in new_played_cards],
             [c.value for c in client_cards],
             [c.value for c in users_played_cards[last_player]]
-                if last_player != client_player else None
+                if last_player != client_player and users_played_cards[last_player] != None else None
         )
-        if _if_input_legal:
-            logger.info(f"now play: {new_played_cards}")
+        if legal_input:
+            tcp_handler.logger.info(f"now play: {new_played_cards}")
             tcp_handler.send_playing_heartbeat(finished=True)
             break
         g_terminal_handler.err = '(非法牌型)'
