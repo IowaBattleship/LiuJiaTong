@@ -273,19 +273,20 @@ def playing(
         new_played_cards = read_userinput(client_cards)
 
         # 11/03/2024: 支持Card类
-        tcp_handler.logger.info(f"new_played_cards: {new_played_cards}")
-        tcp_handler.logger.info(f"client_cards: {client_cards}")
-        tcp_handler.logger.info(f"users_played_cards[last_player]: {users_played_cards[last_player] if last_player != client_player else None}")
+        tcp_handler.logger.info(f"New Played: {new_played_cards}")
+        tcp_handler.logger.info(f"Client Cards: {client_cards}")
+        tcp_handler.logger.info(f"Last Player: {last_player}. Played: {users_played_cards[last_player] if last_player != client_player else None}")
+        tcp_handler.logger.info(f"Client Player: {client_player}")
         legal_input, new_score = validate_user_input(
             utils.strs_to_ints(new_played_cards),
-            utils.cards_to_ints(client_cards),
-            utils.cards_to_ints(users_played_cards[last_player])
-                if last_player != client_player else None
+            client_cards,
+            users_played_cards[last_player] if last_player != client_player else None
         )
         if legal_input:
-            tcp_handler.logger.info(f"now play: {new_played_cards}")
+            tcp_handler.logger.info(f"Now play: {new_played_cards}")
             tcp_handler.send_playing_heartbeat(finished=True)
             break
+        tcp_handler.logger.info(f"illegal input: {new_played_cards}")
         g_terminal_handler.err = '(非法牌型)'
         g_terminal_handler.print()
     

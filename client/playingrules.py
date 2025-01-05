@@ -407,11 +407,10 @@ def if_enough_card(user_input: list[int], user_card: list[Card]) -> tuple[bool, 
 
 # 判断用户从控制台的输入是否合法，若合法，返回重新排列后的输入
 def validate_user_input(
-    user_input: list[int], # 用户输入
-    user_card: list[Card], # 用户手牌
-    last_played_cards: list[Card] # 上家出的牌
+    user_input       : list[int],  # 用户输入
+    user_card        : list[Card], # 用户手牌
+    last_played_cards: list[Card]  # 上家出的牌
 ) -> tuple[bool, int]:
-    logger.info("validate_user_input")
     assert user_input is not None
     # 判断输入字符是否合法，并判断是否skip
     for x in user_input:

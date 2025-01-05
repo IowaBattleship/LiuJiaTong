@@ -84,5 +84,21 @@ class TestNetwork(unittest.TestCase):
         # 关闭套接字
         self.tear_down(server_socket, socket_a, conn)
 
+    def test_send_bool_to_socket(self):
+        server_socket, socket_a, conn = self.set_up(54323)
+
+        # 发送数据
+        print("Sending data: False")
+        send_data_to_socket(False, socket_a)
+
+        # 接收数据
+        print("Receiving data...")
+        received_data = recv_data_from_socket(conn)
+        self.assertEqual(False, received_data)
+        print("Received data:", received_data)
+
+        # 关闭套接字
+        self.tear_down(server_socket, socket_a, conn)
+
 if __name__ == '__main__':
     unittest.main()

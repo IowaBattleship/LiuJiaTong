@@ -60,6 +60,10 @@ def strs_to_ints(cards: list[str]):
 def cards_to_ints(cards: list[Card]):
     if cards is None:
         return None
+    # 检查数据类型
+    for c in cards:
+        if not isinstance(c, Card):
+            raise TypeError('cards must be Card type')
     return [c.value for c in cards]
 
 

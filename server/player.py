@@ -60,21 +60,32 @@ class Player(GameStateMachine):
         except Exception as e:
             self.__handle_error(e)
     def recv_player_info(self): 
+        """
+        接收玩家信息，并更新游戏状态
+
+        该函数负责接收客户端发送的玩家信息，包括玩家手牌、已出牌和当前得分。
+        同时，它还会更新游戏状态，包括玩家手牌、已出牌和当前得分。
+        """
         assert self.error is False
         try:
             with gvar.users_info_lock:
                 print(f"Now round:{self.client_player} -> {gvar.users_info[self.client_player]}")
-            # 等客户端的heartbeat返回值为真，意味着出了有效牌
-            while self.tcp_handler.recv_playing_heartbeat() is False:
+
+            # 等待客户端的heartbeat返回值为真，意味着出了有效牌
+            while not self.tcp_handler.recv_playing_heartbeat():
                 pass
+
+            # 接收客户端发送的玩家信息
             user_cards, user_played_cards, now_score = \
                 self.tcp_handler.recv_player_reply()
+            
+            # 更新游戏状态
             with gvar.game_lock:
                 assert gvar.users_played_cards[self.client_player] == [], \
                     gvar.users_played_cards[self.client_player]
-                gvar.users_cards[self.client_player] = user_cards
-                gvar.users_played_cards[self.client_player] = user_played_cards
-                gvar.now_score = now_score
+                gvar.users_cards[self.client_player]        = user_cards        # 更新玩家手牌
+                gvar.users_played_cards[self.client_player] = user_played_cards # 更新玩家已出牌
+                gvar.now_score                              = now_score         # 更新当前得分
                 print(f'Player {self.pid}({self.client_player}) played cards:{gvar.users_played_cards[self.client_player]}')
         except Exception as e:
             self.__handle_error(e)
