@@ -430,3 +430,13 @@ def validate_user_input(
         last_played_cards_values = [last_card.value for last_card in last_played_cards]
         _last_played_cards = sorted(last_played_cards_values, reverse=True)
         return if_not_first_input_legal(_user_input, _last_played_cards), score
+    
+# 02/01/2025: 支持Card类
+def validate_user_selected_cards(
+    selected_cards: list[Card], 
+    user_cards: list[Card],
+    last_played_cards: list[Card]
+) -> bool:
+    selected_cards_values = [card.value for card in selected_cards]
+    result, _ = validate_user_input(selected_cards_values, user_cards, last_played_cards)
+    return result

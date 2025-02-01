@@ -9,4 +9,4 @@ for ($i = 1; $i -le 5; $i++) {
 }
 
 # 最后一个用户用于测试GUI模式
-Start-Process PowerShell -ArgumentList "-NoExit", "-Command", "python ./client --ip $ip --port $port --user-name user_6 --mode CLI"
+Start-Process PowerShell -ArgumentList "-NoExit", "-Command", "python ./client --ip $ip --port $port --user-name user_6 --mode GUI"

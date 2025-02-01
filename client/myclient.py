@@ -36,18 +36,18 @@ class Client:
         self.client             : socket           = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 连接到服务端
         self.config             : Config           = None                   # 客户端配置文件
         self.no_cookie          : bool             = no_cookie              # 禁用cookie恢复
-        self.client_player      : int              = 0                      # 客户端用户标识
+        self.client_player      : int              = 0                      # 客户端用户标识，是所处位置吗？
         self.client_cards       : list[Card]       = []                     # 持有牌
         self.users_cards        : list[list[Card]] = [[] for _ in range(6)] # 所有用户的牌，用于最后游戏结束时展现寻找战犯
         self.is_player          : bool             = False                  # 玩家/旁观者
-        self.users_name         : list[str]        = ["" for _ in range(6)] # 用户名字
+        self.users_name         : list[str]        = ["" for _ in range(6)] # 用户名字，按照出牌顺序排序
         self.game_over          : int              = 0                      # 游戏结束标志，非0代表已经结束
         self.now_score          : int              = 0                      # 场上的分数
         self.now_player         : int              = 0                      # 当前的玩家
         self.users_cards_num    : list[int]        = [0 for _ in range(6)]  # 用户牌数
         self.users_score        : list[int]        = [0 for _ in range(6)]  # 用户分数
         self.users_played_cards : list[list[Card]] = [[] for _ in range(6)] # 场上的牌
-        self.head_master        : int              = 0                      # 头科
+        self.head_master        : int              = 0                      # 头科, 默认为-1, 否则是用户序号
         self.his_now_score      : int              = 0                      # 历史场上分数，用于判断是否发生了得分
         self.his_last_player    : int              = None                   # 历史上一个打牌的人，用于判断是否上次发生打牌事件
         self.is_start           : bool             = False                  # 记录是否游戏还在开局, False代表游戏尚未开始
@@ -319,10 +319,16 @@ class Client:
                     # 更新本地数据
                     self.users_played_cards[self.client_player] = new_played_cards # 更新玩家打出的牌
                     if new_played_cards != ['F']:
-                        for card in new_played_cards:
-                            self.client_cards.remove(card) # 更新剩余手牌
+                        self.remove_cards(new_played_cards)
                     self.now_score += new_score # 更新场上分数
 
                     # 更新服务端数据
                     self.send_player_info() # 将数据发送给服务器
                 self.handle_connection_error(player_playing_cards, "在游戏时与服务器链接失效(用户打牌)")
+
+    def remove_cards(self, cards: list[Card]):
+        for card in cards:
+            for i in range(len(self.client_cards)):
+                if self.client_cards[i] == card:
+                    self.client_cards.pop(i) # 更新剩余手牌
+                    break

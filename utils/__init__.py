@@ -66,6 +66,14 @@ def cards_to_ints(cards: list[Card]):
             raise TypeError('cards must be Card type')
     return [c.value for c in cards]
 
+def cards_to_strs(cards: list[Card]):
+    if cards is None:
+        return None
+    # 检查数据类型
+    for c in cards:
+        if not isinstance(c, Card):
+            raise TypeError('cards must be Card type')
+    return [str(c) for c in cards]
 
 def draw_cards(cards: list[Card], targets: list[str]) -> list[Card]:
     # 双指针遍历cards和targets，找到value与targets中int值相同的card
@@ -80,6 +88,47 @@ def draw_cards(cards: list[Card], targets: list[str]) -> list[Card]:
             i += 1
     return result
 
+def calculate_score(cards: list[Card]):
+    score = 0
+    for c in cards:
+        if c.value == 5:
+            score += 5
+        elif c.value == 10 or c.value == 13:
+            score += 10
+    return score
+
+# 01/04/2024: 支持Card类
+def get_card_count(client_cards: list[Card], card: str) -> int:
+    result = 0
+    for c in client_cards:
+        if c.get_cli_str() == card:
+            result += 1
+    return result
+
+def head_master_in_team(head_master: int, client_id: int) -> bool:
+    return head_master in [client_id, (client_id + 2) % 6, (client_id + 4) % 6]
+
+def calculate_team_scores(head_master: int, client_id: int, users_cards_num: list[int], users_scores: list[int]) -> tuple[int, int]:
+    if head_master_in_team(head_master, client_id):
+        my_team_score = calculate_head_master_team_score(client_id, users_scores)
+        opposing_team_score = calculate_normal_team_score((client_id + 1) % 6, users_cards_num, users_scores)
+    elif head_master_in_team(head_master, (client_id + 1) % 6):
+        opposing_team_score = calculate_head_master_team_score((client_id + 1) % 6, users_scores)
+        my_team_score = calculate_normal_team_score(client_id, users_cards_num, users_scores)
+    else:
+        my_team_score = calculate_normal_team_score(client_id, users_cards_num, users_scores)
+        opposing_team_score = calculate_normal_team_score((client_id + 1) % 6, users_cards_num, users_scores)
+    return my_team_score, opposing_team_score
+
+def calculate_head_master_team_score(client_id: int, users_scores: list[int]):
+    return users_scores[client_id] + users_scores[(client_id + 2) % 6] + users_scores[(client_id + 4) % 6]
+
+def calculate_normal_team_score(client_id: int, users_cards_num: list[int], users_scores: list[int]):
+    team_score = 0
+    team_score += users_scores[client_id] if users_cards_num[client_id] == 0 else 0
+    team_score += users_scores[(client_id + 2) % 6] if users_cards_num[(client_id + 2) % 6] == 0 else 0
+    team_score += users_scores[(client_id + 4) % 6] if users_cards_num[(client_id + 4) % 6] == 0 else 0
+    return team_score
 
 # 返回上一位出牌玩家下标
 def last_played(played_cards, player):

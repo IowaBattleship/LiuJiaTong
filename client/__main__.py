@@ -35,20 +35,19 @@ if __name__ == '__main__':
 
     utils.register_signal_handler(ctrl_c_handler)
     client = Client(args.no_cookie)
-
-    # 11/02/2024: 增加GUI模式
-    if args.mode == "GUI":
-        logger.info("启动GUI模式")
-        set_interface_type("GUI")
-        init_gui()
-    else:
-        logger.info("启动命令行模式")
-
     if args.ip == None or args.port == None or args.user_name == None:
         client.load_config()
     else:
         client.config = Config(args.ip, args.port, args.user_name)
         client.init_logger()
+        
+    # 11/02/2024: 增加GUI模式
+    if args.mode == "GUI":
+        client.logger.info("启动GUI模式")
+        set_interface_type("GUI")
+        init_gui(client.logger)
+    else:
+        client.logger.info("启动命令行模式")
 
     client.connect(client.config.ip, client.config.port)
     utils.disable_echo()

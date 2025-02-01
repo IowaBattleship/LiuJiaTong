@@ -4,7 +4,7 @@ from terminal_printer import *
 import utils
 import copy
 from card import Card
-
+from FieldInfo import FieldInfo
 from gui import update_gui
 
 INTERFACE_TYPE = "CLI" # "CLI" or "GUI", default "CLI"
@@ -162,9 +162,11 @@ def gen_player_field_paragraph(
     player_name = Sentence()
     player_name.minwidth = name_maxlen
     set_color(player_name)
+
     # 如果该玩家已经逃出，则将其名字打上删除线
     if num_of_cards == 0:
         player_name.strikethrough = True
+
     # 如果该玩家现在在打牌，则将其名字闪烁显示并加上*
     if is_current_player:
         player_name.blink = True
@@ -200,7 +202,7 @@ def main_interface(
     is_start,
     is_player,
     client_cards,
-    client_player,
+    client_player: int, # 当前玩家的ID
     # 场面信息
     users_name,
     users_score,
@@ -282,7 +284,12 @@ def main_interface(
     if INTERFACE_TYPE == "CLI":
         print_article(article, th) # 打印
     else:
-        update_gui(client_cards)
+        field_info = FieldInfo(
+            is_start, is_player, client_player, client_cards, 
+            users_name, users_score, users_cards_num, users_cards, 
+            users_played_cards, head_master, now_score, now_player, 
+            last_player, his_now_score, his_last_player)
+        update_gui(field_info)
 
     _play_sound(
         is_start=is_start,

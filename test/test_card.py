@@ -20,12 +20,12 @@ class TestCard(unittest.TestCase):
     def test_to_dict(self):
         """测试 Card 类的 to_dict 方法"""
         card = Card(Suits.spade, 11)
-        expected_dict = {'suit': 'spade', 'value': 11}
+        expected_dict = {'suit': 'Spade', 'value': 11}
         self.assertEqual(card.to_dict(), expected_dict)
     
     def test_from_dict(self):
         """测试 from_dict 类方法"""
-        card_dict = {'suit': 'diamond', 'value': 12}
+        card_dict = {'suit': 'Diamond', 'value': 12}
         card = Card.from_dict(card_dict)
         self.assertIsInstance(card, Card)
         self.assertEqual(card.suit, Suits.diamond)
@@ -37,6 +37,14 @@ class TestCard(unittest.TestCase):
         construct = pickle.loads(data)
         self.assertEqual(construct[0][0].suit, Suits.spade)
         self.assertEqual(construct[0][0].value, 11)
+
+class TestSuits(unittest.TestCase):
+    def test_suits(self):
+        self.assertEqual(Suits.heart.value, 'Heart')
+        self.assertEqual(Suits.diamond.value, 'Diamond')
+        self.assertEqual(Suits.club.value, 'Club')
+        self.assertEqual(Suits.spade.value, 'Spade')
+        self.assertEqual(Suits.empty.value, '')
 
 if __name__ == '__main__':
     unittest.main()
