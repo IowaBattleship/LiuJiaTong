@@ -1,0 +1,821 @@
+"""Flet-based GUI implementation, mirroring gui.py logic."""
+
+import os
+import sys
+import asyncio
+import queue
+import logging
+import time
+from logging import Logger
+
+# Ensure project root in path
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+import logger as logger_module
+import flet as ft
+from card import Card, Suits
+from FieldInfo import FieldInfo
+import utils
+import playingrules
+
+# Import card_queue from parent gui for compatibility (set when FLET is selected)
+def _get_card_queue():
+    from gui import card_queue
+    return card_queue
+
+# DEFAULT_WINDOW_HEIGHT (810) = 4 * DEFAULT_CARD_HEIGHT (100) + 3 * VERTICAL_CARD_SPACING (110) + 2 * DEFAULT_VERTICAL_MARGIN (40)
+
+# Default layout constants (same as gui.py)
+DEFAULT_WINDOW_WIDTH = 1440
+DEFAULT_WINDOW_HEIGHT = 810
+DEFAULT_VERTICAL_MARGIN = 40
+HORIZONTAL_CARD_MARGIN = 160 # Card's left margin from the edge of the window
+VERTICAL_CARD_SPACING = 110
+DEFAULT_CARD_WIDTH = 71
+DEFAULT_CARD_HEIGHT = 100
+DEFAULT_CARD_SPACING = 20
+PLAYED_CARD_SPACING = 30
+
+# Player info card styling
+PLAYER_CARD_AVATAR_BG = "#2d4a6f"
+PLAYER_CARD_TEXT_COLOR = "#e8e8e8"
+PLAYER_CARD_BORDER = "#3d5a80"
+PLAYER_CARD_PADDING = 8
+PLAYER_CARD_AVATAR_SIZE = 36
+PLAYER_CARD_RADIUS = 14
+PLAYER_NAME_MAX_LEN = 8
+# Slightly wider player info cards to better fit three lines of text
+UNIFIED_INFO_SECTION_WIDTH = 125
+UNIFIED_INFO_SECTION_HEIGHT = 68
+PLAYER_CARD_GRADIENT_START = "#0f2035"
+PLAYER_CARD_GRADIENT_END = "#1e3a52"
+
+# Score panel styling
+SCORE_PANEL_GRADIENT_START = "#0d1820"
+SCORE_PANEL_GRADIENT_END = "#1e3a52"
+SCORE_PANEL_RADIUS = 16
+SCORE_NUMBER_FONT = 24
+SCORE_LABEL_FONT = 11
+
+# Player position offsets
+PLAYER_OFFSET_SE, PLAYER_OFFSET_NE, PLAYER_OFFSET_TOP, PLAYER_OFFSET_NW, PLAYER_OFFSET_SW = 1, 2, 3, 4, 5
+
+_images_dir = os.path.join(_project_root, "client", "images")
+
+_gui_flet_logger = None
+
+def _card_image_path(card: Card, target_height: int) -> str:
+    """Return absolute path to card image for Flet."""
+    if card.suit == Suits.empty:
+        name = "JOKER-B.png" if card.value == 16 else "JOKER-A.png"
+    elif card.value > 10:
+        name = card.suit.value + utils.int_to_str(card.value) + ".png"
+    else:
+        name = card.suit.value + str(card.value) + ".png"
+    return os.path.abspath(os.path.join(_images_dir, name))
+
+
+def _background_path() -> str:
+    return os.path.abspath(os.path.join(_images_dir, "Background.png"))
+
+
+class LayoutParams:
+    """Layout parameters computed from window (width, height)."""
+
+    def __init__(self, width: int, height: int):
+        self.width = width
+        self.height = height
+        self.scale_x = width / DEFAULT_WINDOW_WIDTH
+        self.scale_y = height / DEFAULT_WINDOW_HEIGHT
+        self.scale = min(self.scale_x, self.scale_y, 1.5)
+
+        self.vertical_margin = int(DEFAULT_VERTICAL_MARGIN * self.scale_y)
+        self.card_width = int(DEFAULT_CARD_WIDTH * self.scale)
+        self.card_height = int(DEFAULT_CARD_HEIGHT * self.scale)
+        self.card_spacing = int(DEFAULT_CARD_SPACING * self.scale)
+        self.played_card_spacing = int(PLAYED_CARD_SPACING * self.scale)
+        self.vertical_card_spacing = int(VERTICAL_CARD_SPACING * self.scale)
+        self.horizontal_card_margin = int(HORIZONTAL_CARD_MARGIN * self.scale_x)
+
+        self.info_section_width = int(UNIFIED_INFO_SECTION_WIDTH * self.scale)
+        self.info_section_height = int(UNIFIED_INFO_SECTION_HEIGHT * self.scale)
+
+        # Leave a bit more breathing room at the bottom so that
+        # hand cards are not visually flush with the window edge.
+        bottom_margin = int(40 * self.scale_y)
+
+        self.my_played_cards_y = height - self.vertical_margin - self.card_height * 2 - self.vertical_card_spacing
+        self.top_played_cards_y = self.vertical_margin + self.card_height + self.vertical_card_spacing
+
+        # Action buttons are anchored from the bottom-right corner so they
+        # always stay within the visible area even after window resize or
+        # a full UI rebuild triggered by hand-card clicks.
+        self.button_right_margin = int(30 * self.scale_x)
+        self.button_bottom_margin = int(40 * self.scale_y)
+        self.button_spacing = int(55 * self.scale_y)
+        self.score_anchor_x = width - int(50 * self.scale_x)
+        self.font_size = max(12, int(20 * self.scale))
+        
+        self.avatar_size = int(PLAYER_CARD_AVATAR_SIZE * self.scale)
+        self.score_number_size = max(18, int(24 * self.scale))
+        self.score_label_size = max(9, int(11 * self.scale))
+
+        # Y offsets between卡牌和 info 卡片中心，用于垂直居中 info section
+        self.info_section_offset = self.card_height // 2 - self.info_section_height // 2
+        # 顶部/底部 info section 距离左右边缘的水平边距
+        self.horizontal_info_section_margin = int(180 * self.scale_x)
+
+        # --- 底部区域：以底边为基线 ---
+        # 底部手牌以 bottom_margin 为基线贴底；
+        # info section 与手牌底边对齐（而不是以前的“上下居中”）。
+        self.bottom_card_y = height - bottom_margin - self.card_height
+        self.bottom_info_section_y = height - bottom_margin - self.info_section_height - self.info_section_offset
+
+        # 顶部玩家：仍然以 vertical_margin 为顶部基线，info section 与牌面垂直居中
+        self.top_card_y = self.vertical_margin
+        self.top_info_section_y = self.top_card_y + self.info_section_offset
+
+        # 左右两侧玩家：在竖直方向等间距分布（top / upper / lower / bottom 四层卡牌中心等间距）
+        self.horizontal_info_margin = int(20 * self.scale_x)  # 左右侧 info section 与窗口边缘的水平边距
+        self.horizontal_card_margin = self.horizontal_info_margin + self.info_section_width + int(20 * self.scale_x)
+
+        # 计算四层卡牌中心的等间距位置
+        top_center = self.top_card_y + self.card_height / 2
+        bottom_center = self.bottom_card_y + self.card_height / 2
+        band_gap = (bottom_center - top_center) / 3
+
+        upper_center = top_center + band_gap
+        lower_center = top_center + 2 * band_gap
+
+        # 侧边玩家（NW/NE/SE/SW）的牌面 Y 坐标
+        self.upper_card_y = int(upper_center - self.card_height / 2)
+        self.lower_card_y = int(lower_center - self.card_height / 2)
+
+        # 对应 info section 继续与牌面垂直居中
+        self.upper_info_section_y = self.upper_card_y + self.info_section_offset
+        self.lower_info_section_y = self.lower_card_y + self.info_section_offset
+
+_update_queue = queue.Queue()
+
+class FletGUI:
+    """Main Flet GUI controller. Holds field state and draws all game elements.
+    Mirrors gui.GUI structure (tkinter)."""
+
+    def __init__(self, page: ft.Page | None, logger: Logger):
+        self.page = page
+        self.logger = logger
+        self.field_info: FieldInfo | None = None  # Updated on each round
+        self.selected_card_flag: list[bool] = []  # Per-card selection state
+        self.content_stack: ft.Stack | None = None  # Game content container, set when page exists
+
+        if page is not None:
+            self._setup_page()
+
+    def _setup_page(self) -> None:
+        """Initialize page window and content stack. Called when page is available."""
+        page = self.page
+        page.title = "LiuJiaTong"
+        page.window.width = DEFAULT_WINDOW_WIDTH
+        page.window.height = DEFAULT_WINDOW_HEIGHT
+        page.window.min_width = 800
+        page.window.min_height = 500
+        page.padding = 0
+        page.theme_mode = ft.ThemeMode.DARK
+        page.bgcolor = "#0d1820"
+
+        self.content_stack = ft.Stack(expand=True, fit=ft.StackFit.EXPAND)
+        main_container = ft.Container(
+            content=self.content_stack,
+            expand=True,
+            bgcolor="#0d1820",
+        )
+        page.add(main_container)
+
+        # Initial placeholder until first FieldInfo update
+        self.content_stack.controls = [
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("六家统", size=32, weight=ft.FontWeight.BOLD, color=PLAYER_CARD_TEXT_COLOR),
+                        ft.Text("等待游戏开始...", size=18, color="#a0a0a0"),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    expand=True,
+                ),
+                alignment=ft.Alignment.CENTER,
+                expand=True,
+            )
+        ]
+        # Rebuild layout when window is resized so all controls stay aligned.
+        page.on_resize = self._on_page_resize
+        page.update()
+
+    def update(self, info: FieldInfo) -> None:
+        """Public method: push new field info to update queue (client thread safe)."""
+        if _gui_flet_logger:
+            _gui_flet_logger.info("FletGUI.update: received FieldInfo, client_id=%s", info.client_id)
+        _update_queue.put(info)
+
+    def _on_page_resize(self, e: ft.ControlEvent) -> None:
+        """Handle window resize: recompute layout and redraw using last FieldInfo."""
+        if _gui_flet_logger:
+            _gui_flet_logger.info(
+                "page resized: width=%s, height=%s",
+                self.page.width,
+                self.page.height,
+            )
+        if self.field_info is not None:
+            # Rebuild current frame with new LayoutParams based on updated window size.
+            self.build_and_update(self.field_info)
+
+    def _get_layout(self) -> LayoutParams:
+        """
+        根据当前页面的实际可见宽高计算布局参数。
+
+        注意：在 Flet 中，用户拖动调整窗口大小时，`page.width/height` 会先反映
+        实际尺寸，而 `page.window.width/height` 可能仍然是上一次的目标值，
+        这会导致我们总是用“上一帧”的尺寸来重建 UI（表现为拖动第二次才生效）。
+
+        这里优先使用 `page.width/height`，只有在其为 0 时才退回到
+        `page.window.width/height`，从而避免一帧延迟的问题。
+        """
+        page_w = self.page.width or self.page.window.width or 800
+        page_h = self.page.height or self.page.window.height or 500
+        w = max(page_w, 800)
+        h = max(page_h, 500)
+        return LayoutParams(w, h)
+
+    def _build_avatar(self, initial: str, layout: LayoutParams) -> ft.Container:
+        return ft.Container(
+            width=layout.avatar_size,
+            height=layout.avatar_size,
+            border_radius=layout.avatar_size // 2,
+            bgcolor=PLAYER_CARD_AVATAR_BG,
+            content=ft.Text(
+                initial, size=layout.font_size, weight=ft.FontWeight.BOLD,
+                color=PLAYER_CARD_TEXT_COLOR, text_align=ft.TextAlign.CENTER
+            ),
+        )
+
+    """
+    Build user info text column: name, cards, score.
+
+    Text size and wrapping are adjusted to fit within the player info
+    card width so that we avoid ugly truncation or multi-line wrapping
+    even on smaller windows.
+    """
+    def _build_user_info_text_column(
+        self, name: str, cards_num: int, score: int, layout: LayoutParams
+    ) -> ft.Column:
+        # Base sizes derived from layout, then slightly reduced on narrow cards.
+        title_sz = layout.font_size
+        sub_sz = max(8, layout.font_size - 1)
+
+        # When window is small, info_section_width shrinks; in that case slightly
+        # reduce font sizes to keep all three lines on a single row.
+        if layout.info_section_width < 110:
+            title_sz = max(10, int(title_sz * 0.9))
+            sub_sz = max(8, int(sub_sz * 0.9))
+
+        return ft.Column(
+            [
+                ft.Text(
+                    name,
+                    size=title_sz,
+                    weight=ft.FontWeight.BOLD,
+                    color=PLAYER_CARD_TEXT_COLOR,
+                    no_wrap=True,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+                ft.Text(
+                    f"剩{cards_num}张",
+                    size=sub_sz,
+                    color=PLAYER_CARD_TEXT_COLOR,
+                    no_wrap=True,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+                ft.Text(
+                    f"得分{score}",
+                    size=sub_sz,
+                    color=PLAYER_CARD_TEXT_COLOR,
+                    no_wrap=True,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
+            spacing=2,
+            tight=True,
+        )
+
+    """
+    Build player info card: circular avatar + gradient panel with name, cards, score. Unified size for all 6.
+    """
+    def _build_single_player_info_card(
+        self,
+        name: str,
+        cards_num: int,
+        score: int,
+        x: int, # x coordinate of the upper left point of the card
+        y: int, # y coordinate of the upper left point of the card
+        layout: LayoutParams,
+        anchor: str = "w",
+    ) -> ft.Container:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_build_single_player_info_card: name=%s, cards_num=%s, score=%s", name, cards_num, score)
+
+        w, h = layout.info_section_width, layout.info_section_height
+        pad = int(PLAYER_CARD_PADDING * layout.scale)
+        display_name = _truncate_name(name, PLAYER_NAME_MAX_LEN)
+        initial = name[0] if name else "N"
+
+        # Stack positioning: left/right are distances from stack edges.
+        # For "e" (east), right = distance from parent's right to control's right = horizontal_info_margin.
+        left = x if anchor == "w" else None
+        right = x if anchor == "e" else None
+        top = y
+
+        return ft.Container(
+            content=ft.Row(
+                [
+                    self._build_avatar(initial, layout),
+                    self._build_user_info_text_column(display_name, cards_num, score, layout),
+                ],
+                spacing=pad,
+            ),
+            width=w,
+            height=h,
+            padding=pad,
+            border_radius=PLAYER_CARD_RADIUS,
+            gradient=ft.LinearGradient(
+                begin=ft.Alignment.TOP_CENTER,
+                end=ft.Alignment.BOTTOM_CENTER,
+                colors=[PLAYER_CARD_GRADIENT_START, PLAYER_CARD_GRADIENT_END],
+            ),
+            border=ft.border.all(1, PLAYER_CARD_BORDER),
+            left=left,
+            right=right,
+            top=top,
+        )
+
+    def _build_player_info_cards(self, info: FieldInfo, layout: LayoutParams) -> list[ft.Control]:
+        """Build all 6 player info cards (self, top, and 4 sides)."""
+        client_id = info.client_id
+        controls: list[ft.Control] = []
+
+        # My info card (bottom)
+        controls.append(
+            self._build_single_player_info_card(
+                info.user_names[client_id],
+                info.users_cards_num[client_id],
+                info.user_scores[client_id],
+                layout.horizontal_info_section_margin,
+                layout.bottom_info_section_y,
+                layout,
+                "w",
+            )
+        )
+
+        # Top player info card
+        top_id = (client_id + PLAYER_OFFSET_TOP) % 6
+        controls.append(
+            self._build_single_player_info_card(
+                info.user_names[top_id],
+                info.users_cards_num[top_id],
+                info.user_scores[top_id],
+                layout.horizontal_info_section_margin,
+                layout.top_info_section_y,
+                layout,
+                "w",
+            )
+        )
+
+        # Left / right players (NW, NE, SW, SE)
+        for user_id, is_left, is_upper in [
+            ((client_id + PLAYER_OFFSET_SE) % 6, False, False),
+            ((client_id + PLAYER_OFFSET_NE) % 6, False, True),
+            ((client_id + PLAYER_OFFSET_NW) % 6, True, True),
+            ((client_id + PLAYER_OFFSET_SW) % 6, True, False),
+        ]:
+            controls.append(
+                self._build_single_player_info_card(
+                    info.user_names[user_id],
+                    info.users_cards_num[user_id],
+                    info.user_scores[user_id],
+                    layout.horizontal_info_margin,
+                    layout.upper_info_section_y if is_upper else layout.lower_info_section_y,
+                    layout,
+                    "w" if is_left else "e",
+                )
+            )
+
+        return controls
+
+    def _build_hand_cards(self, info: FieldInfo, layout: LayoutParams) -> list[ft.Control]:
+        """Build top player's hand backs and my own hand cards."""
+        client_id = info.client_id
+        controls: list[ft.Control] = []
+
+        # Top player card backs
+        top_id = (client_id + PLAYER_OFFSET_TOP) % 6
+        start_x = _centered_row_start(layout, 36)
+        top_cards_num = info.users_cards_num[top_id]
+        for i in range(top_cards_num):
+            controls.append(
+                ft.Container(
+                    content=ft.Image(src=_background_path(), fit=ft.BoxFit.CONTAIN, height=layout.card_height),
+                    left=start_x + i * layout.card_spacing,
+                    top=layout.vertical_margin,
+                )
+            )
+
+        # My hand cards
+        if len(self.selected_card_flag) != len(info.client_cards):
+            self.selected_card_flag = [False] * len(info.client_cards)
+
+        for i, card in enumerate(info.client_cards):
+            y_off = -20 if self.selected_card_flag[i] else 0
+            idx = i
+            # Absolute positioning must be on the Stack's direct child, so we put
+            # left/top on GestureDetector instead of wrapping Container.
+            controls.append(
+                ft.GestureDetector(
+                    content=ft.Image(
+                        src=_card_image_path(card, layout.card_height),
+                        fit=ft.BoxFit.CONTAIN,
+                        height=layout.card_height,
+                    ),
+                    left=start_x + i * layout.card_spacing,
+                    top=layout.bottom_card_y + y_off,
+                    on_tap=lambda e, i=idx: self._on_card_click(e, i, info),
+                )
+            )
+
+        return controls
+
+    def _build_played_cards(self, info: FieldInfo, layout: LayoutParams) -> list[ft.Control]:
+        """Build all played cards on the table for every player."""
+        client_id = info.client_id
+        controls: list[ft.Control] = []
+
+        # My played cards (bottom centre)
+        my_played = info.users_played_cards[client_id]
+        if my_played:
+            sx = _centered_row_start(layout, len(my_played))
+            for i, card in enumerate(my_played):
+                controls.append(
+                    ft.Container(
+                        content=ft.Image(
+                            src=_card_image_path(card, layout.card_height),
+                            fit=ft.BoxFit.CONTAIN,
+                            height=layout.card_height,
+                        ),
+                        left=sx + i * layout.card_spacing,
+                        top=layout.my_played_cards_y,
+                    )
+                )
+
+        # Top player's played cards
+        top_id = (client_id + PLAYER_OFFSET_TOP) % 6
+        top_played = info.users_played_cards[top_id]
+        if top_played:
+            sx = _centered_row_start(layout, len(top_played))
+            for i, card in enumerate(top_played):
+                controls.append(
+                    ft.Container(
+                        content=ft.Image(
+                            src=_card_image_path(card, layout.card_height),
+                            fit=ft.BoxFit.CONTAIN,
+                            height=layout.card_height,
+                        ),
+                        left=sx + i * layout.card_spacing,
+                        top=layout.top_played_cards_y,
+                    )
+                )
+
+        # Side players' backs and played cards
+        def _cy(is_upper: bool) -> int:
+            return layout.upper_card_y if is_upper else layout.lower_card_y
+
+        for user_id, is_left, is_upper in [
+            ((client_id + PLAYER_OFFSET_NW) % 6, True, True),
+            ((client_id + PLAYER_OFFSET_NE) % 6, False, True),
+            ((client_id + PLAYER_OFFSET_SW) % 6, True, False),
+            ((client_id + PLAYER_OFFSET_SE) % 6, False, False),
+        ]:
+            played = info.users_played_cards[user_id]
+            cy = _cy(is_upper)
+            if is_left:
+                controls.append(
+                    ft.Container(
+                        content=ft.Image(
+                            src=_background_path(),
+                            fit=ft.BoxFit.CONTAIN,
+                            height=layout.card_height,
+                        ),
+                        left=layout.horizontal_card_margin,
+                        top=cy,
+                    )
+                )
+                for i, card in enumerate(played):
+                    controls.append(
+                        ft.Container(
+                            content=ft.Image(
+                                src=_card_image_path(card, layout.card_height),
+                                fit=ft.BoxFit.CONTAIN,
+                                height=layout.card_height,
+                            ),
+                            left=layout.horizontal_card_margin
+                            + layout.card_width
+                            + layout.played_card_spacing
+                            + i * layout.card_spacing,
+                            top=cy,
+                        )
+                    )
+            else:
+                controls.append(
+                    ft.Container(
+                        content=ft.Image(
+                            src=_background_path(),
+                            fit=ft.BoxFit.CONTAIN,
+                            height=layout.card_height,
+                        ),
+                        right=layout.horizontal_card_margin,
+                        top=cy,
+                    )
+                )
+                for i, card in enumerate(played):
+                    controls.append(
+                        ft.Container(
+                            content=ft.Image(
+                                src=_card_image_path(card, layout.card_height),
+                                fit=ft.BoxFit.CONTAIN,
+                                height=layout.card_height,
+                            ),
+                            right=layout.horizontal_card_margin
+                            + layout.card_width
+                            + layout.played_card_spacing
+                            + (len(played) - 1 - i) * layout.card_spacing,
+                            top=cy,
+                        )
+                    )
+
+        return controls
+
+    def _build_score_panel(self, layout: LayoutParams, info: FieldInfo) -> ft.Container:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_build_score_panel: client_id=%s, now_score=%s", info.client_id, info.now_score)
+        client_id = info.client_id
+        my_team, opp_team = utils.calculate_team_scores(
+            info.head_master, client_id, info.users_cards_num, info.user_scores
+        )
+        now_player = _truncate_name(info.user_names[info.now_player], 6)
+        head_master = _truncate_name(
+            info.user_names[info.head_master] if info.head_master != -1 else "无", 6
+        )
+        panel_w = int(200 * layout.scale_x)
+        panel_h = int(200 * layout.scale_y)
+        pad = int(14 * layout.scale)
+        rows = [
+            ("己方得分", str(my_team)),
+            ("对方得分", str(opp_team)),
+            ("场上分数", str(info.now_score)),
+            ("当前出牌", now_player),
+            ("头科", head_master),
+        ]
+
+        # --- Responsive positioning ---
+        # 默认放在右上角，但当窗口高度较小、计分板高度较大时，可能会覆盖右上角玩家信息卡。
+        # 这里通过简单的碰撞检测，让计分板在需要时“躲开”右上的玩家：
+        #   1. 正常情况：top = vertical_margin（靠近顶部）
+        #   2. 如果会与右上方玩家的 info 卡垂直重叠，则移动到该 info 卡下方留出一点间距
+        gap_y = int(10 * layout.scale_y)
+        top = layout.vertical_margin
+
+        score_bottom = top + panel_h
+        player_top = layout.upper_info_section_y
+        player_bottom = player_top + layout.info_section_height
+
+        # 如果默认位置会与右上玩家 info 卡垂直重叠，则把计分板移到玩家下方
+        if score_bottom > player_top:
+            candidate_top = player_bottom + gap_y
+            # 避免计分板超出窗口底部
+            max_top = max(0, layout.height - panel_h - gap_y)
+            top = min(candidate_top, max_top)
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("━━ 比分面板 ━━", size=layout.score_label_size, weight=ft.FontWeight.BOLD, color=PLAYER_CARD_TEXT_COLOR),
+                    *[
+                        ft.Row(
+                            [
+                                ft.Text(label, size=layout.score_label_size, color="#a0a0a0"),
+                                ft.Text(value, size=SCORE_NUMBER_FONT if i < 3 else layout.score_label_size, weight=ft.FontWeight.BOLD if i < 3 else None, color="#ffd700"),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        )
+                        for i, (label, value) in enumerate(rows)
+                    ],
+                ],
+                spacing=4,
+                expand=True,
+            ),
+            width=panel_w,
+            height=panel_h,
+            padding=pad,
+            border_radius=SCORE_PANEL_RADIUS,
+            gradient=ft.LinearGradient(
+                begin=ft.Alignment.TOP_CENTER,
+                end=ft.Alignment.BOTTOM_CENTER,
+                colors=[SCORE_PANEL_GRADIENT_START, SCORE_PANEL_GRADIENT_END],
+            ),
+            right=layout.width - layout.score_anchor_x,
+            top=top,
+        )
+
+    def _build_full_content(self, info: FieldInfo) -> list:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_build_full_content: client_id=%s, client_cards=%d", info.client_id, len(info.client_cards))
+        layout = self._get_layout()
+        client_id = info.client_id
+        controls = []
+
+        # 1. 玩家信息卡片（6 个玩家）
+        controls.extend(self._build_player_info_cards(info, layout))
+
+        # 2. 顶部玩家手牌背面 + 我方手牌
+        controls.extend(self._build_hand_cards(info, layout))
+
+        # 3. 场上已出牌
+        controls.extend(self._build_played_cards(info, layout))
+
+        # Build action buttons (reset / confirm / skip).
+        # They are positioned from the bottom-right so that even when the
+        # window height is small or the UI is rebuilt after hand-card
+        # clicks, the lowest button ("跳过") will not be pushed out of view.
+        button_defs = [
+            ("重置", lambda e: self._on_reset(e, info)),
+            ("确定", lambda e: self._on_confirm(e, info)),
+            ("跳过", lambda e: self._on_skip(e, info)),
+        ]
+        last_idx = len(button_defs) - 1
+        for i, (label, handler) in enumerate(button_defs):
+            # Place "跳过" closest to the bottom edge.
+            bottom = layout.button_bottom_margin + (last_idx - i) * layout.button_spacing
+            controls.append(
+                ft.Container(
+                    content=ft.ElevatedButton(content=label, on_click=handler),
+                    right=layout.button_right_margin,
+                    bottom=bottom,
+                )
+            )
+
+        # Build score panel
+        controls.append(self._build_score_panel(layout, info))
+
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_build_full_content: done, total controls=%d", len(controls))
+        return controls
+
+    def _on_card_click(self, e, idx: int, info: FieldInfo) -> None:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_on_card_click: idx=%s, card=%s", idx, info.client_cards[idx] if idx < len(info.client_cards) else "?")
+        self.selected_card_flag[idx] = not self.selected_card_flag[idx]
+        self.build_and_update(info)
+
+    def _on_reset(self, e, info: FieldInfo) -> None:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_on_reset: clear all selected cards")
+        for i in range(len(self.selected_card_flag)):
+            self.selected_card_flag[i] = False
+        self.build_and_update(info)
+
+    def _on_confirm(self, e, info: FieldInfo) -> None:
+        selected = [info.client_cards[i] for i in range(len(info.client_cards)) if self.selected_card_flag[i]]
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_on_confirm: selected=%s", [str(c) for c in selected])
+        last_played = info.users_played_cards[info.last_player] if info.last_player != info.client_id else None
+        if playingrules.validate_user_selected_cards(selected, info.client_cards, last_played):
+            _get_card_queue().put(selected)
+            if _gui_flet_logger:
+                _gui_flet_logger.info("_on_confirm: validated, sent to card_queue")
+        else:
+            if _gui_flet_logger:
+                _gui_flet_logger.info("_on_confirm: validation failed, invalid card selection")
+        for i in range(len(self.selected_card_flag)):
+            self.selected_card_flag[i] = False
+        self.build_and_update(info)
+
+    def _on_skip(self, e, info: FieldInfo) -> None:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_on_skip: pass turn")
+        for i in range(len(self.selected_card_flag)):
+            self.selected_card_flag[i] = False
+        _get_card_queue().put(["F"])
+        self.build_and_update(info)
+
+    def build_and_update(self, info: FieldInfo) -> None:
+        if self.content_stack is None:
+            return
+        if _gui_flet_logger:
+            _gui_flet_logger.info("build_and_update: start, client_id=%s", info.client_id)
+        self.field_info = info
+        setattr(self.page, "_last_info", info)
+        try:
+            self.content_stack.controls = self._build_full_content(info)
+            if _gui_flet_logger:
+                _gui_flet_logger.info("build_and_update: success, calling page.update()")
+        except Exception as ex:
+            if _gui_flet_logger:
+                _gui_flet_logger.exception("build_and_update: render error: %s", ex)
+            self.content_stack.controls = [
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text("渲染错误", size=24, color="#ff6b6b"),
+                            ft.Text(str(ex), size=14, color="#a0a0a0"),
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        expand=True,
+                    ),
+                    alignment=ft.Alignment.CENTER,
+                    expand=True,
+                )
+            ]
+        self.page.update()
+
+    async def _poll_updates(self) -> None:
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_poll_updates: started")
+        while True:
+            await asyncio.sleep(0.1)
+            try:
+                info = _update_queue.get_nowait()
+                if _gui_flet_logger:
+                    _gui_flet_logger.info("_poll_updates: got FieldInfo, client_id=%s", info.client_id)
+                self.build_and_update(info)
+            except queue.Empty:
+                pass
+
+
+def update_gui(info: FieldInfo) -> None:
+    """Public API: push new field info to GUI."""
+    if _gui_flet_logger:
+        _gui_flet_logger.info("update_gui: push FieldInfo to queue, client_id=%s", info.client_id)
+    _update_queue.put(info)
+
+
+def _truncate_name(name: str, max_len: int) -> str:
+    if not name:
+        return "?"
+    if len(name) <= max_len:
+        return name
+    return name[: max_len - 1] + "…"
+
+
+def _calc_text_line_positions(h: int, pad: int, font_sz: int, line_count: int = 3) -> tuple:
+    sub_font = max(8, font_sz - 1)
+    base_line_height = max(14, int(max(font_sz, sub_font) * 1.4))
+    available = max(0, h - 2 * pad)
+    line_height = max(10, min(available // line_count, base_line_height))
+    total_height = line_height * line_count
+    start_y = pad + max(0, (available - total_height) // 2)
+    return line_height, tuple(start_y + i * line_height for i in range(line_count))
+
+
+def _centered_row_start(layout: LayoutParams, card_count: int) -> int:
+    total_width = layout.card_width + layout.card_spacing * max(card_count, 1)
+    return (layout.width - total_width) // 2
+
+
+async def main(page: ft.Page):
+    """Flet main entry point (async)."""
+    if _gui_flet_logger:
+        _gui_flet_logger.info("main: Flet page started")
+
+    gui = FletGUI(page, _gui_flet_logger or logging.getLogger("gui_flet"))
+    # IMPORTANT: use the same `gui` module as __main__ (`from gui import ...`)
+    # to avoid creating two separate module instances (`gui` vs `client.gui`)
+    # which would desynchronise GUI state and pending updates.
+    import gui as gui_module
+    gui_module.register_gui_page(gui)
+
+    page.run_task(gui._poll_updates)
+    gui_module.register_gui_fully_ready()
+
+
+def init_gui_flet(client_logger: Logger) -> None:
+    """Start Flet GUI. Must run in main thread (Flet uses signal.signal). Blocks until window closes."""
+    global _gui_flet_logger
+    _gui_flet_logger = client_logger
+    client_logger.info("init_gui_flet: Starting Flet GUI (main thread)")
+
+    # Same reason as above: keep a single shared `gui` module.
+    import gui as gui_module
+    gui_module.register_gui_proxy(FletGUI(None, client_logger))
+
+    ft.app(target=main, assets_dir=os.path.join(_project_root, "client", "images"))

@@ -1,174 +1,16 @@
-import logging
-import queue
-import threading
-from enum import Enum
-from logging import Logger
-
-from FieldInfo import FieldInfo
-
-
-class UIFramework(Enum):
-    """UI framework options for the game interface."""
-    TKINTER = "tkinter"
-    FLET = "flet"
-
-
-class GUIState(Enum):
-    """Lifecycle states for GUI initialisation."""
-    NOT_READY = "not_ready"        # GUI module not loaded yet
-    PROXY_READY = "proxy_ready"    # Proxy registered (e.g. Flet queue), but UI not visible
-    PAGE_READY = "page_ready"      # UI page created, controls exist
-    FULLY_READY = "fully_ready"    # UI consuming updates, safe for direct dispatch
-
-
-# Thread-safe queue for passing user-selected cards from GUI to game logic
-card_queue = queue.Queue()
-
-_gui_logger: Logger = logging.getLogger("gui")
-_gui_instance = None
-_gui_state = GUIState.NOT_READY
-_pending_updates: list[FieldInfo] = []
-
-
-def _set_gui_state(state: GUIState, instance=None) -> None:
-    """Update GUI state machine and optionally replace the GUI instance."""
-    global _gui_state, _gui_instance
-
-    prev_state = _gui_state
-    if state == GUIState.NOT_READY:
-        _gui_instance = None
-        _pending_updates.clear()
-    elif instance is not None:
-        _gui_instance = instance
-
-    _gui_state = state
-    _gui_logger.info(
-        "GUI state transition: %s -> %s",
-        prev_state.value if isinstance(prev_state, GUIState) else str(prev_state),
-        state.value,
-    )
-
-    if state != GUIState.NOT_READY and _gui_instance is not None:
-        _flush_pending_updates()
-
-
-def _flush_pending_updates() -> None:
-    """Deliver buffered updates to the active GUI instance."""
-    while _pending_updates and _gui_instance is not None:
-        info = _pending_updates.pop(0)
-        try:
-            _gui_logger.info(
-                "Flushing buffered FieldInfo (client_id=%s) to GUI (state=%s)",
-                info.client_id,
-                _gui_state.value,
-            )
-            _gui_instance.update(info)
-        except Exception:
-            _gui_logger.exception(
-                "Failed to flush buffered FieldInfo (client_id=%s)", info.client_id
-            )
-            break
-
-
-def register_gui_proxy(instance) -> None:
-    """Register a proxy GUI instance (e.g. Flet background queue)."""
-    _set_gui_state(GUIState.PROXY_READY, instance)
-
-
-def register_gui_page(instance) -> None:
-    """Register the concrete GUI page instance."""
-    _set_gui_state(GUIState.PAGE_READY, instance)
-
-
-def register_gui_fully_ready(instance=None) -> None:
-    """Mark the GUI as fully ready. Optional instance replacement."""
-    _set_gui_state(GUIState.FULLY_READY, instance)
-
-
-def update_gui(info: FieldInfo) -> None:
-    """Public API: push new field info to GUI."""
-    if _gui_instance is not None and _gui_state != GUIState.NOT_READY:
-        _gui_logger.info(
-            "update_gui: dispatch FieldInfo (client_id=%s, state=%s)",
-            info.client_id,
-            _gui_state.value,
-        )
-        _gui_instance.update(info)
-    else:
-        _pending_updates.append(info)
-        _gui_logger.info(
-            "update_gui: buffer FieldInfo (client_id=%s, state=%s, pending=%d)",
-            info.client_id,
-            _gui_state.value,
-            len(_pending_updates),
-        )
-
-
-def _start_tkinter_gui(logger: Logger) -> None:
-    """Start the Tkinter GUI in a daemon thread."""
-
-    def runner():
-        from client.gui_tkinter import run_tkinter_gui
-
-        def on_ready(instance):
-            register_gui_fully_ready(instance)
-
-        run_tkinter_gui(logger, card_queue, on_ready)
-
-    threading.Thread(target=runner, daemon=True).start()
-
-
-def _start_flet_gui(logger: Logger) -> None:
-    """Start the Flet GUI in the main thread."""
-    from client.user_interface.gui_flet import init_gui_flet
-
-    init_gui_flet(logger)
-
-
-def init_gui(logger: Logger, framework: UIFramework = UIFramework.TKINTER) -> None:
-    """Entry point used by the client to bootstrap the GUI."""
-    global _gui_logger
-
-    _gui_logger = logger
-    _set_gui_state(GUIState.NOT_READY)
-
-    starters = {
-        UIFramework.TKINTER: _start_tkinter_gui,
-        UIFramework.FLET: _start_flet_gui,
-    }
-    starter = starters.get(framework)
-    if starter is None:
-        raise ValueError(f"Unknown UI framework: {framework}")
-
-    starter(logger)
-
-'''
+"""Tkinter-based GUI implementation extracted from gui.py."""
 
 import tkinter as tk
-import threading
-import logging
-from enum import Enum
 from PIL import Image, ImageTk, ImageDraw
+from logging import Logger
 
-import logger
-
-_gui_logger = None
-
-
-class UIFramework(Enum):
-    """UI framework options for the game interface."""
-
-    TKINTER = "tkinter"
-    FLET = "flet"
 from card import Card, Suits
 from FieldInfo import FieldInfo
 import utils
-import queue
-from logging import Logger
 import playingrules
 
-# Thread-safe queue for passing user-selected cards from GUI to game logic
-card_queue = queue.Queue()
+# This module-level card_queue will be injected by gui.run_tkinter_gui.
+card_queue = None
 
 # Default layout constants (base values for dynamic scaling)
 DEFAULT_WINDOW_WIDTH = 1440
@@ -216,16 +58,11 @@ PLAYER_OFFSET_TOP, PLAYER_OFFSET_NE, PLAYER_OFFSET_NW, PLAYER_OFFSET_SW, PLAYER_
 # Debounce delay (ms) before redraw after last Configure. Fires when user releases mouse (resize stops).
 RESIZE_DEBOUNCE_MS = 100
 
-# Module-level reference for external API compatibility (set when GUI is created)
-_gui_instance = None
-# Buffer for updates received before Flet GUI is ready (FLET mode)
-_pending_updates: list = []
-
 
 def _hex_to_rgb(hex_color: str) -> tuple:
     """Convert #RRGGBB to (r, g, b)."""
     h = hex_color.lstrip("#")
-    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+    return tuple(int(h[i: i + 2], 16) for i in (0, 2, 4))
 
 
 def _create_gradient_rounded_image(
@@ -303,7 +140,7 @@ class ImageCache:
         key = (width, height, color_start, color_end, radius)
         if key not in self._gradient_cache:
             self._gradient_cache[key] = _create_gradient_rounded_image(
-                width, height, color_start, color_end, radius
+                width, height, color_start, color_end, radius=radius
             )
         return self._gradient_cache[key]
 
@@ -554,44 +391,42 @@ class GUI:
         """Draw anti-aliased rounded rectangle using create_polygon with smooth=True."""
         # Ensure radius doesn't exceed half of width or height
         r = min(radius, (x2 - x1) // 2, (y2 - y1) // 2)
-        
+
         # Define polygon points with duplicated corners for smooth curve control
         # Points structure: (x, y) pairs arranged clockwise from top-left corner
         points = [
             # Top edge with rounded corners
             x1 + r, y1, x1 + r, y1,      # Top-left (duplicated)
             x2 - r, y1, x2 - r, y1,      # Top-right (duplicated)
-            
-            # Right edge with rounded corners  
+
+            # Right edge with rounded corners
             x2, y1, x2, y1 + r,          # Top-right curve
             x2, y1 + r, x2, y2 - r,      # Right edge
             x2, y2 - r, x2, y2,          # Bottom-right curve
-            
+
             # Bottom edge with rounded corners
             x2 - r, y2, x2 - r, y2,      # Bottom-right (duplicated)
             x1 + r, y2, x1 + r, y2,      # Bottom-left (duplicated)
-            
+
             # Left edge with rounded corners
             x1, y2, x1, y2 - r,          # Bottom-left curve
             x1, y2 - r, x1, y1 + r,      # Left edge
             x1, y1 + r, x1, y1,          # Top-left curve
         ]
-        
+
         # Configure polygon options
         opts = {
-            "smooth": True,           # Enable anti-aliased curves
-            "splinesteps": 36,        # High quality curve rendering
+            "smooth": True,
+            "splinesteps": 36,
         }
-        
-        # Add fill and outline if provided
+
         if fill:
             opts["fill"] = fill
         if outline:
             opts["outline"] = outline
-            
-        # Apply any additional kwargs
+
         opts.update(kwargs)
-        
+
         return canvas.create_polygon(points, **opts)
 
     def _draw_player_card_background(
@@ -604,35 +439,29 @@ class GUI:
         """Draw player card background: gradient base + shadow, overlay, border (like score panel)."""
         radius = radius or PLAYER_CARD_RADIUS
         pad = 2
-        # 1. Outer shadow / glow (behind)
         self._create_rounded_rect(
             canvas, pad + 2, pad + 2, w - pad + 2, h - pad + 2, radius + 1,
             fill=PLAYER_CARD_SHADOW, outline="",
         )
-        # 2. Gradient base (like score panel)
         grad_img = self.image_cache.get_gradient_image(
             w, h, PLAYER_CARD_GRADIENT_START, PLAYER_CARD_GRADIENT_END, radius=radius
         )
         canvas.create_image(w // 2, h // 2, image=grad_img)
         canvas.grad_img = grad_img
-        # 3. Top highlight for 3D (lighter strip at top)
         hl_h = max(5, h // 5)
         self._create_rounded_rect(
             canvas, pad + 2, pad + 2, w - pad - 2, pad + 2 + hl_h, radius - 1,
             fill=PLAYER_CARD_HIGHLIGHT, outline="",
         )
-        # 4. Inner shadow at bottom (darker strip)
         sh_h = max(6, h // 4)
         canvas.create_rectangle(
             pad + radius, h - pad - sh_h, w - pad - radius, h - pad,
             fill=PLAYER_CARD_SHADOW, outline="",
         )
-        # 5. Semi-transparent overlay (stipple simulates transparency)
         self._create_rounded_rect(
             canvas, pad + 1, pad + 1, w - pad - 1, h - pad - 1, radius - 1,
             fill=PLAYER_CARD_OVERLAY, outline="", stipple="gray75",
         )
-        # 6. Border
         self._create_rounded_rect(
             canvas, pad, pad, w - pad, h - pad, radius,
             fill="", outline=PLAYER_CARD_BORDER,
@@ -659,7 +488,6 @@ class GUI:
         display_name = self._truncate_name(name, max_name_len)
         initial = name[0] if name else "?"
 
-        # Main panel: Canvas with gradient background (like score panel)
         canvas = tk.Canvas(
             self.root,
             width=w,
@@ -669,13 +497,11 @@ class GUI:
         self._draw_player_card_background(canvas, w, h)
         canvas.place(x=x, y=y, anchor=anchor)
 
-        # Avatar circle (left side)
         ax, ay = pad + avatar_sz // 2, h // 2
         r = avatar_sz // 2 - 2
         canvas.create_oval(ax - r, ay - r, ax + r, ay + r, fill=PLAYER_CARD_AVATAR_BG, outline=PLAYER_CARD_BORDER)
         canvas.create_text(ax, ay, text=initial, fill=PLAYER_CARD_TEXT_COLOR, font=("Microsoft YaHei", font_sz, "bold"))
 
-        # Info text (right of avatar) - dynamically computed line positions, no overlap
         info_x = pad + avatar_sz + pad
         sub_font = max(8, font_sz - 1)
         _, (y1, y2, y3) = self._calc_text_line_positions(h, pad, font_sz)
@@ -708,25 +534,21 @@ class GUI:
             self._widget_updaters.append(updater)
 
     def _centered_row_start(self, layout: LayoutParams, card_count: int) -> int:
-        """Return start X for horizontally centered card row."""
         total_width = layout.card_width + layout.card_spacing * max(card_count, 1)
         return (layout.width - total_width) // 2
 
     def _draw_user_cards(self):
-        """Draw all user cards (vertical, upper horizontal, lower horizontal pairs)."""
         self.logger.info("draw_user_cards")
         self._draw_vertical_user_pairs()
         self._draw_upper_horizontal_user_pairs()
         self._draw_lower_horizontal_user_pairs()
 
     def _draw_vertical_user_pairs(self):
-        """Draw vertical pairs: my cards (bottom) and top user (top)."""
         layout = self._get_layout()
         info_x = int(100 * layout.scale_x)
         info_y_offset = layout.vertical_margin + layout.card_height // 2
         client_id = self.field_info.client_id
 
-        # My info
         get_my_info_pos = lambda l: (int(100 * l.scale_x), l.height - (l.vertical_margin + l.card_height // 2), "w")
         self._draw_player_info_card(
             self.field_info.user_names[client_id],
@@ -739,7 +561,6 @@ class GUI:
             get_pos=get_my_info_pos,
         )
 
-        # My cards
         self.my_card_labels = []
         self.selected_card_flag = [False] * len(self.field_info.client_cards)
         start_x = self._centered_row_start(layout, 36)
@@ -752,7 +573,6 @@ class GUI:
             label = self._draw_one_card(card, x, y, layout, clickable=True, get_pos=get_pos)
             self.my_card_labels.append(label)
 
-        # My played cards
         my_played = self.field_info.users_played_cards[client_id]
         self.logger.info(f"my_played_cards: {my_played}")
         if my_played:
@@ -761,7 +581,6 @@ class GUI:
                 x = self._centered_row_start(layout, len(my_played)) + i * layout.card_spacing
                 self._draw_one_card(card, x, layout.my_played_cards_y, layout, clickable=False, get_pos=get_pos)
 
-        # Top user info
         top_id = (client_id + PLAYER_OFFSET_TOP) % 6
         get_top_info_pos = lambda l: (int(100 * l.scale_x), l.vertical_margin + l.card_height // 2, "w")
         self._draw_player_info_card(
@@ -775,14 +594,12 @@ class GUI:
             get_pos=get_top_info_pos,
         )
 
-        # Top user card backs
         top_cards_num = self.field_info.users_cards_num[top_id]
         for i in range(top_cards_num):
             get_pos = lambda l, idx=i, n=36: (self._centered_row_start(l, n) + idx * l.card_spacing, l.vertical_margin, "nw")
             x = start_x + i * layout.card_spacing
             self._draw_background(x, layout.vertical_margin, layout, get_pos=get_pos)
 
-        # Top user played cards
         top_played = self.field_info.users_played_cards[top_id]
         self.logger.info(f"top_user_played_cards: {top_played}")
         if top_played:
@@ -792,7 +609,6 @@ class GUI:
                 self._draw_one_card(card, x, layout.top_played_cards_y, layout, clickable=False, get_pos=get_pos)
 
     def _draw_horizontal_user_pair(self, user_id: int, card_y: int, is_left: bool, layout: LayoutParams, is_upper: bool):
-        """Draw one horizontal user: info label + card back + played cards. Registers updaters."""
         info_y = card_y + layout.card_height // 2
         played = self.field_info.users_played_cards[user_id]
         self.logger.info(f"user_{user_id}_played_cards: {played}")
@@ -800,7 +616,6 @@ class GUI:
         def _cy(l):
             return l.upper_card_y if is_upper else l.lower_card_y
 
-        # Info label (unified size for all 6 player cards)
         info_x = layout.info_margin if is_left else layout.width - layout.info_margin
         get_info_pos = lambda l: (l.info_margin if is_left else l.width - l.info_margin, _cy(l) + l.card_height // 2, "w" if is_left else "e")
         self._draw_player_info_card(
@@ -832,19 +647,16 @@ class GUI:
                 self._draw_one_card(card, x, card_y, layout, clickable=False, get_pos=get_pos)
 
     def _draw_upper_horizontal_user_pairs(self):
-        """Draw upper horizontal pairs: NW (left) and NE (right)."""
         layout = self._get_layout()
         self._draw_horizontal_user_pair((self.field_info.client_id + PLAYER_OFFSET_NW) % 6, layout.upper_card_y, True, layout, is_upper=True)
         self._draw_horizontal_user_pair((self.field_info.client_id + PLAYER_OFFSET_NE) % 6, layout.upper_card_y, False, layout, is_upper=True)
 
     def _draw_lower_horizontal_user_pairs(self):
-        """Draw lower horizontal pairs: SW (left) and SE (right)."""
         layout = self._get_layout()
         self._draw_horizontal_user_pair((self.field_info.client_id + PLAYER_OFFSET_SW) % 6, layout.lower_card_y, True, layout, is_upper=False)
         self._draw_horizontal_user_pair((self.field_info.client_id + PLAYER_OFFSET_SE) % 6, layout.lower_card_y, False, layout, is_upper=False)
 
     def _draw_buttons(self):
-        """Draw Reset/Confirm/Skip buttons. Registers updaters for reposition."""
         self.logger.info("draw_buttons")
         layout = self._get_layout()
         for i, (text, cmd) in enumerate([("重置", self._on_reset_button_click), ("确定", self._on_confirm_button_click), ("跳过", self._on_skip_button_click)]):
@@ -857,7 +669,6 @@ class GUI:
             self._widget_updaters.append(make_updater(btn, get_pos))
 
     def _draw_scores(self):
-        """Draw dedicated score panel with gradient, rounded corners, LCD-style numbers."""
         layout = self._get_layout()
         client_id = self.field_info.client_id
         my_team, opp_team = utils.calculate_team_scores(
@@ -867,14 +678,9 @@ class GUI:
         head_master = self._truncate_name(
             self.field_info.user_names[self.field_info.head_master] if self.field_info.head_master != -1 else "无", 6
         )
-
         panel_w = int(200 * layout.scale_x)
         panel_h = int(200 * layout.scale_y)
         pad = int(14 * layout.scale)
-        lcd_sz = layout.score_number_size
-        lbl_sz = layout.score_label_size
-
-        # Score panel: Canvas with gradient rounded background (like player cards)
         canvas = tk.Canvas(self.root, width=panel_w, height=panel_h, highlightthickness=0)
         grad_img = self.image_cache.get_gradient_image(
             panel_w, panel_h, SCORE_PANEL_GRADIENT_START, SCORE_PANEL_GRADIENT_END, radius=SCORE_PANEL_RADIUS
@@ -882,18 +688,14 @@ class GUI:
         canvas.create_image(panel_w // 2, panel_h // 2, image=grad_img)
         canvas.grad_img = grad_img
         canvas.place(x=layout.score_anchor_x, y=layout.vertical_margin, anchor="ne")
-
-        # Title
         canvas.create_text(
-            panel_w // 2, pad + lbl_sz,
+            panel_w // 2, pad + layout.score_label_size,
             text="━━ 比分面板 ━━",
-            font=("Microsoft YaHei", lbl_sz, "bold"),
+            font=("Microsoft YaHei", layout.score_label_size, "bold"),
             fill=PLAYER_CARD_TEXT_COLOR,
         )
-
-        # Score rows
-        y = pad + lbl_sz * 3
-        row_h = max(22, lbl_sz + 10)
+        y = pad + layout.score_label_size * 3
+        row_h = max(22, layout.score_label_size + 10)
         rows = [
             ("己方得分", str(my_team), True),
             ("对方得分", str(opp_team), True),
@@ -903,8 +705,8 @@ class GUI:
         ]
         for i, (label_text, value, use_lcd) in enumerate(rows):
             yy = y + i * row_h
-            canvas.create_text(pad, yy, text=label_text, font=(SCORE_LABEL_FONT[0], lbl_sz), fill="#a0a0a0", anchor="nw")
-            val_font = ("Consolas", lcd_sz, "bold") if use_lcd else (SCORE_LABEL_FONT[0], lbl_sz)
+            canvas.create_text(pad, yy, text=label_text, font=(SCORE_LABEL_FONT[0], layout.score_label_size), fill="#a0a0a0", anchor="nw")
+            val_font = ("Consolas", layout.score_number_size, "bold") if use_lcd else (SCORE_LABEL_FONT[0], layout.score_label_size)
             canvas.create_text(panel_w - pad, yy, text=value, font=val_font, fill="#ffd700", anchor="ne")
 
         def score_updater(l):
@@ -929,7 +731,6 @@ class GUI:
         self._widget_updaters.append(score_updater)
 
     def _on_my_card_click(self, event):
-        """Toggle card selection: move up when selected, down when deselected."""
         self.logger.info("on_my_card_click")
         label = event.widget
         try:
@@ -937,12 +738,10 @@ class GUI:
         except ValueError:
             return
         dx, dy = label.winfo_x(), label.winfo_y()
-        # Toggle: selected -> move down 20px, deselected -> move up 20px
         label.place(x=dx, y=dy + 20 if self.selected_card_flag[i] else dy - 20)
         self.selected_card_flag[i] = not self.selected_card_flag[i]
 
     def _on_reset_button_click(self):
-        """Deselect all cards and reset their positions."""
         self.logger.info("on_reset_button_click")
         for i, label in enumerate(self.my_card_labels):
             if self.selected_card_flag[i]:
@@ -950,73 +749,31 @@ class GUI:
                 self.selected_card_flag[i] = False
 
     def _on_confirm_button_click(self):
-        """Validate selected cards and send to server via card_queue."""
         self.logger.info("on_confirm_button_click")
         selected_cards = [self.field_info.client_cards[i] for i, _ in enumerate(self.my_card_labels) if self.selected_card_flag[i]]
-
         last_played = self.field_info.users_played_cards[self.field_info.last_player] if self.field_info.last_player != self.field_info.client_id else None
         if not playingrules.validate_user_selected_cards(selected_cards, self.field_info.client_cards, last_played):
             self.logger.info("Invalid card selection")
             return
-
         self.logger.info(f"selected_cards: {[str(c) for c in selected_cards]}")
         card_queue.put(selected_cards)
 
     def _on_skip_button_click(self):
-        """Reset selection and send skip signal to server."""
         self.logger.info("on_skip_button_click")
         self._on_reset_button_click()
         card_queue.put(["F"])
 
 
-def update_gui(info: FieldInfo) -> None:
-    """Public API: push new field info to GUI. Buffers if GUI not ready (FLET mode)."""
-    global _gui_instance, _pending_updates
-    if _gui_instance is not None:
-        _gui_instance.logger.info(
-            "update_gui: dispatch FieldInfo to active GUI (client_id=%s)", info.client_id
-        )
-        _gui_instance.update(info)
-    else:
-        _gui_logger.info(
-            "update_gui: GUI not ready, buffering FieldInfo (client_id=%s)", info.client_id
-        )
-        _pending_updates[:] = [info]  # Keep only latest until GUI ready
+def run_tkinter_gui(logger: Logger, queue_obj, on_ready):
+    """Bootstrap the Tkinter GUI and inform caller when ready."""
+    global card_queue
+    card_queue = queue_obj
 
-
-def _start_tkinter_gui(logger: Logger) -> None:
-    """Start tkinter GUI in a daemon thread."""
-    def run():
-        global _gui_instance
-        root = tk.Tk()
-        _gui_instance = GUI(root, logger)
+    root = tk.Tk()
+    gui = GUI(root, logger)
+    on_ready(gui)
+    try:
         root.mainloop()
+    finally:
+        logger.info("Tkinter GUI closed")
 
-    threading.Thread(target=run, daemon=True).start()
-
-
-def _start_flet_gui(logger: Logger) -> None:
-    """Start Flet GUI (blocking, must run in main thread)."""
-    from client.user_interface.gui_flet import init_gui_flet
-    init_gui_flet(logger)
-
-
-def init_gui(logger, framework: UIFramework = UIFramework.TKINTER) -> None:
-    """Start GUI. Must be called before update_gui.
-
-    Args:
-        logger: Logger instance.
-        framework: UI framework to use. TKINTER runs in daemon thread; FLET blocks in main thread.
-    """
-    logger.info("init_gui")
-    global _gui_logger
-    _gui_logger = logger
-    starters = {
-        UIFramework.TKINTER: _start_tkinter_gui,
-        UIFramework.FLET: _start_flet_gui,
-    }
-    starter = starters.get(framework)
-    if starter is None:
-        raise ValueError(f"Unknown UI framework: {framework}")
-    starter(logger)
-'''

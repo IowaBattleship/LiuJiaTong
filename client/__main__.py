@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import threading
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
@@ -15,7 +16,7 @@ sound.check_sound_player()
 
 from interface import set_interface_type
 import logger
-from gui import init_gui
+from gui import init_gui, UIFramework
 from myclient import Client
 from config import Config
 
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip', type=str, help='ip address')
     parser.add_argument('--port', type=int, help='port')
     parser.add_argument('--user-name', type=str, help='user name')
-    parser.add_argument('--mode', type=str, default="CLI", help='mode')
+    parser.add_argument('--mode', type=str, default="CLI", help='mode: CLI, GUI, or GUI_FLET')
     parser.add_argument('-n', '--no-cookie', action='store_true', default=False, help='disable cookies')
     args = parser.parse_args()
 
@@ -43,14 +44,28 @@ if __name__ == '__main__':
         
     # 11/02/2024: 增加GUI模式
     if args.mode == "GUI":
-        client.logger.info("启动GUI模式")
+        client.logger.info("启动GUI模式 (tkinter)")
         set_interface_type("GUI")
-        init_gui(client.logger)
+        init_gui(client.logger, UIFramework.TKINTER)
+    elif args.mode == "GUI_FLET":
+        client.logger.info("启动GUI模式 (flet)")
+        set_interface_type("GUI")
+
+        def run_client():
+            client.connect(client.config.ip, client.config.port)
+            utils.disable_echo()
+            client.run()
+            utils.enable_echo()
+            client.close()
+
+        client_thread = threading.Thread(target=run_client, daemon=True)
+        client_thread.start()
+        init_gui(client.logger, UIFramework.FLET)
     else:
         client.logger.info("启动命令行模式")
-
-    client.connect(client.config.ip, client.config.port)
-    utils.disable_echo()
-    client.run()
-    utils.enable_echo()
-    client.close()
+    if args.mode != "GUI_FLET":
+        client.connect(client.config.ip, client.config.port)
+        utils.disable_echo()
+        client.run()
+        utils.enable_echo()
+        client.close()
