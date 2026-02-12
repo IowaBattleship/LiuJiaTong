@@ -14,6 +14,13 @@ from card import Card, Suits
     [[17,17,17,17], (CardType.red_joker_bomb, 17)],
     [[8,10,11,16,17], (CardType.straight, 12)],
     [[3,3,4,16], (CardType.straight_pairs, 4)],
+    # AA22 及其相关牌型（二连对的最小类型）
+    [[14,14,15,15], (CardType.straight_pairs, 1)],                 # 纯 AA22
+    [[14,14,15,16], (CardType.straight_pairs, 1)],                 # AA2J（Joker 补一个 2）
+    [[14,15,16,17], (CardType.straight_pairs, 1)],                 # A2JJ（两王各补一张 A/2）
+    [[14,14,16,16], (CardType.normal_bomb, 14)],                   # AAJJ：按规则应为炸弹
+    [[15,15,16,16], (CardType.normal_bomb, 15)],                   # 22JJ：按规则应为炸弹
+    [[13,13,14,15], (CardType.illegal_type, 0)],                   # 含其它点数，不是 AA22 型
     [[3,3,3,4,16,16], (CardType.straight_triples, 4)],
     [[5,5,6,6,8,9,9,9,16,17], (CardType.flight, 9)],
     [[17], (CardType.single, 17)],
@@ -29,8 +36,18 @@ def test_judge_and_transform_cards(user_input, expect):
     assert judge_and_transform_cards(sorted(user_input, reverse=True)) == expect
 
 @pytest.mark.parametrize('user_input, user_card, last_played_cards, expect', [
-    [[4,5,6,7,8,9,13,10,16,17], [4,5,6,7,8,9,9,9,9,9,10,13,14,14,14,15,16,17], None, (False, 25)],
-    [[15,15,15,15,15], None, [4,4,4,4,17], (True, 0)],
+    [
+        [4,5,6,7,8,9,13,10,16,17],
+        [Card(Suits.heart, v) for v in [4,5,6,7,8,9,9,9,9,9,10,13,14,14,14,15,16,17]],
+        None,
+        (False, 25)
+    ],
+    [
+        [15,15,15,15,15],
+        None,
+        [Card(Suits.heart, v) for v in [4,4,4,4,17]],
+        (True, 0)
+    ],
 ])
 def test_validate_user_input(user_input, user_card, last_played_cards, expect):
     assert validate_user_input(user_input, user_card, last_played_cards) == expect

@@ -83,6 +83,21 @@ def if_straight_pairs(cards, card_num, joker_num):
         return CardType.illegal_type, 0
 
     pairs_num = int(len(cards) // 2)
+    # 特殊情况：AA22 视为最小的二连对
+    # 允许用大小王来凑成 AA22，只要牌面仅由 A、2 和大小王构成
+    if pairs_num == 2:
+        a_cnt = card_num.get(14, 0)  # A
+        two_cnt = card_num.get(15, 0)  # 2
+        # 是否包含除 A、2 以外的其它牌
+        has_other_rank = any(
+            3 <= k <= 15 and k not in (14, 15) for k in card_num.keys()
+        )
+        if not has_other_rank and a_cnt <= 2 and two_cnt <= 2 and a_cnt + two_cnt + joker_num == 4:
+            need_joker = max(0, 2 - a_cnt) + max(0, 2 - two_cnt)
+            if need_joker <= joker_num:
+                # 关键牌设为 1，使 AA22 成为最小的二连对
+                return CardType.straight_pairs, 1
+
     # 连对数不超过12次，且除大小王外最大与最小牌相差不超过连对数
     if pairs_num > 12 or cards[joker_num] - cards[-1] + 1 > pairs_num:
         return CardType.illegal_type, 0
