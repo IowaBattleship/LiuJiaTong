@@ -19,6 +19,7 @@ from card import Card, Suits
 from FieldInfo import FieldInfo
 import utils
 import playingrules
+from feature_auto_play.auto_play import auto_select_cards
 
 # Import card_queue from parent gui for compatibility (set when FLET is selected)
 def _get_card_queue():
@@ -169,6 +170,9 @@ class FletGUI:
         self.field_info: FieldInfo | None = None  # Updated on each round
         self.selected_card_flag: list[bool] = []  # Per-card selection state
         self.content_stack: ft.Stack | None = None  # Game content container, set when page exists
+        # 托管相关状态：是否开启托管、以及上一轮自动出牌时的状态快照，防止重复自动出牌
+        self.auto_play_enabled: bool = False
+        self._last_auto_play_state: tuple | None = None
 
         if page is not None:
             self._setup_page()
@@ -660,6 +664,11 @@ class FletGUI:
         button_defs = [
             ("重置", lambda e: self._on_reset(e, info)),
             ("确定", lambda e: self._on_confirm(e, info)),
+            # 托管 / 取消托管 按钮
+            (
+                "取消托管" if self.auto_play_enabled else "托管",
+                lambda e: self._on_toggle_auto_play(e, info),
+            ),
             ("跳过", lambda e: self._on_skip(e, info)),
         ]
         last_idx = len(button_defs) - 1
@@ -718,6 +727,69 @@ class FletGUI:
         _get_card_queue().put(["F"])
         self.build_and_update(info)
 
+    def _on_toggle_auto_play(self, e, info: FieldInfo) -> None:
+        """切换托管状态，并刷新按钮文本。"""
+        self.auto_play_enabled = not self.auto_play_enabled
+        # 切换状态后清空上一轮自动出牌快照，防止新一轮无法触发
+        self._last_auto_play_state = None
+        if _gui_flet_logger:
+            _gui_flet_logger.info(
+                "_on_toggle_auto_play: auto_play_enabled=%s", self.auto_play_enabled
+            )
+        self.build_and_update(info)
+
+    def _is_my_turn(self, info: FieldInfo) -> bool:
+        """是否轮到本客户端玩家出牌。"""
+        return (
+            info.start_flag
+            and info.is_player
+            and info.now_player == info.client_id
+            and len(info.client_cards) > 0
+        )
+
+    def _maybe_auto_play(self, info: FieldInfo) -> None:
+        """在托管开启且轮到本玩家出牌时，自动选择并出牌/跳过。"""
+        if not self.auto_play_enabled or not self._is_my_turn(info):
+            return
+
+        # 使用 (当前出牌人, 手牌值序列, 上家出牌人, 场上分) 作为一次出牌状态的“指纹”，防止重复自动出牌
+        state_fingerprint = (
+            info.now_player,
+            tuple(card.value for card in info.client_cards),
+            info.last_player,
+            info.now_score,
+        )
+        if self._last_auto_play_state == state_fingerprint:
+            return
+
+        self._last_auto_play_state = state_fingerprint
+
+        # 生成自动要出的牌
+        selected = auto_select_cards(info)
+        last_played = (
+            info.users_played_cards[info.last_player]
+            if info.last_player != info.client_id
+            else None
+        )
+
+        if selected:
+            if _gui_flet_logger:
+                _gui_flet_logger.info(
+                    "_maybe_auto_play: auto play cards=%s",
+                    [str(c) for c in selected],
+                )
+            # 再次用 playingrules 校验一遍，保证和手动出牌逻辑一致
+            if playingrules.validate_user_selected_cards(
+                selected, info.client_cards, last_played
+            ):
+                _get_card_queue().put(selected)
+                return
+
+        # 没有任何合法且可出的牌型，或都无法大过场上牌：自动跳过
+        if _gui_flet_logger:
+            _gui_flet_logger.info("_maybe_auto_play: no valid move, auto skip")
+        _get_card_queue().put(["F"])
+
     def build_and_update(self, info: FieldInfo) -> None:
         if self.content_stack is None:
             return
@@ -746,6 +818,12 @@ class FletGUI:
                     expand=True,
                 )
             ]
+        # 构建完界面后检查是否需要进行自动托管出牌
+        try:
+            self._maybe_auto_play(info)
+        except Exception as ex:
+            if _gui_flet_logger:
+                _gui_flet_logger.exception("_maybe_auto_play error: %s", ex)
         self.page.update()
 
     async def _poll_updates(self) -> None:
