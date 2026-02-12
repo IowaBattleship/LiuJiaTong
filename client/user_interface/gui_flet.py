@@ -47,8 +47,8 @@ PLAYER_CARD_PADDING = 8
 PLAYER_CARD_AVATAR_SIZE = 36
 PLAYER_CARD_RADIUS = 14
 PLAYER_NAME_MAX_LEN = 8
-# Slightly wider player info cards to better fit three lines of text
-UNIFIED_INFO_SECTION_WIDTH = 125
+# Slightly wider player info cards to better fit three columns (avatar / name+cards / score)
+UNIFIED_INFO_SECTION_WIDTH = 155
 UNIFIED_INFO_SECTION_HEIGHT = 68
 PLAYER_CARD_GRADIENT_START = "#0f2035"
 PLAYER_CARD_GRADIENT_END = "#1e3a52"
@@ -57,8 +57,9 @@ PLAYER_CARD_GRADIENT_END = "#1e3a52"
 SCORE_PANEL_GRADIENT_START = "#0d1820"
 SCORE_PANEL_GRADIENT_END = "#1e3a52"
 SCORE_PANEL_RADIUS = 16
-SCORE_NUMBER_FONT = 24
-SCORE_LABEL_FONT = 11
+# 数字稍大、标签字号也适度放大，保证可读性
+SCORE_NUMBER_FONT = 26
+SCORE_LABEL_FONT = 13
 
 # Player position offsets
 PLAYER_OFFSET_SE, PLAYER_OFFSET_NE, PLAYER_OFFSET_TOP, PLAYER_OFFSET_NW, PLAYER_OFFSET_SW = 1, 2, 3, 4, 5
@@ -265,24 +266,18 @@ class FletGUI:
         )
 
     """
-    Build user info text column: name, cards, score.
+    Build user info text column: name + remaining cards (middle column).
 
     Text size and wrapping are adjusted to fit within the player info
     card width so that we avoid ugly truncation or multi-line wrapping
     even on smaller windows.
     """
     def _build_user_info_text_column(
-        self, name: str, cards_num: int, score: int, layout: LayoutParams
+        self, name: str, cards_num: int, layout: LayoutParams
     ) -> ft.Column:
-        # Base sizes derived from layout, then slightly reduced on narrow cards.
-        title_sz = layout.font_size
-        sub_sz = max(8, layout.font_size - 1)
-
-        # When window is small, info_section_width shrinks; in that case slightly
-        # reduce font sizes to keep all three lines on a single row.
-        if layout.info_section_width < 110:
-            title_sz = max(10, int(title_sz * 0.9))
-            sub_sz = max(8, int(sub_sz * 0.9))
+        # 中间列字号稍小一些，保证在三列布局下仍然简洁清晰。
+        title_sz = max(11, int(layout.font_size * 0.9))
+        sub_sz = max(9, int(layout.font_size * 0.8))
 
         return ft.Column(
             [
@@ -297,14 +292,6 @@ class FletGUI:
                 ),
                 ft.Text(
                     f"剩{cards_num}张",
-                    size=sub_sz,
-                    color=PLAYER_CARD_TEXT_COLOR,
-                    no_wrap=True,
-                    max_lines=1,
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                ),
-                ft.Text(
-                    f"得分{score}",
                     size=sub_sz,
                     color=PLAYER_CARD_TEXT_COLOR,
                     no_wrap=True,
@@ -343,14 +330,54 @@ class FletGUI:
         right = x if anchor == "e" else None
         top = y
 
+        # 左：头像；中：玩家名 + 剩余手牌；右：得分，形成三列布局。
+        score_title_sz = max(9, int(layout.font_size * 0.75))
+        score_value_sz = max(11, int(layout.font_size * 0.9))
+
+        content_row = ft.Row(
+            [
+                # Avatar (left column)
+                self._build_avatar(initial, layout),
+
+                # Name + remaining cards (middle column)
+                ft.Container(
+                    content=self._build_user_info_text_column(display_name, cards_num, layout),
+                    expand=True,
+                ),
+
+                # Score (right column)
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text(
+                                "得分",
+                                size=score_title_sz,
+                                color="#b0b0b0",
+                                weight=ft.FontWeight.NORMAL,
+                                text_align=ft.TextAlign.RIGHT,
+                            ),
+                            ft.Text(
+                                str(score),
+                                size=score_value_sz,
+                                color=PLAYER_CARD_TEXT_COLOR,
+                                weight=ft.FontWeight.BOLD,
+                                text_align=ft.TextAlign.RIGHT,
+                            ),
+                        ],
+                        spacing=2,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.END,
+                    ),
+                    alignment=ft.Alignment.CENTER_RIGHT,
+                ),
+            ],
+            spacing=pad,
+            alignment=ft.MainAxisAlignment.START,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
         return ft.Container(
-            content=ft.Row(
-                [
-                    self._build_avatar(initial, layout),
-                    self._build_user_info_text_column(display_name, cards_num, score, layout),
-                ],
-                spacing=pad,
-            ),
+            content=content_row,
             width=w,
             height=h,
             padding=pad,
@@ -610,22 +637,35 @@ class FletGUI:
             # 避免计分板超出窗口底部
             max_top = max(0, layout.height - panel_h - gap_y)
             top = min(candidate_top, max_top)
+        # 放大标签字号，使“己方得分 / 对方得分”等文字更清晰
+        label_font = max(SCORE_LABEL_FONT, layout.score_label_size + 1)
+
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("━━ 比分面板 ━━", size=layout.score_label_size, weight=ft.FontWeight.BOLD, color=PLAYER_CARD_TEXT_COLOR),
+                    ft.Text(
+                        "━━ 比分面板 ━━",
+                        size=label_font,
+                        weight=ft.FontWeight.BOLD,
+                        color=PLAYER_CARD_TEXT_COLOR,
+                    ),
                     *[
                         ft.Row(
                             [
-                                ft.Text(label, size=layout.score_label_size, color="#a0a0a0"),
-                                ft.Text(value, size=SCORE_NUMBER_FONT if i < 3 else layout.score_label_size, weight=ft.FontWeight.BOLD if i < 3 else None, color="#ffd700"),
+                                ft.Text(label, size=label_font, color="#a0a0a0"),
+                                ft.Text(
+                                    value,
+                                    size=SCORE_NUMBER_FONT if i < 3 else label_font,
+                                    weight=ft.FontWeight.BOLD if i < 3 else None,
+                                    color="#ffd700",
+                                ),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         )
                         for i, (label, value) in enumerate(rows)
                     ],
                 ],
-                spacing=4,
+                spacing=6,
                 expand=True,
             ),
             width=panel_w,
