@@ -18,11 +18,11 @@ import pytest
 # 确保项目根目录在 sys.path 中，便于直接导入 card / FieldInfo 等模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from card import Card, Suits, generate_cards
-from client.FieldInfo import FieldInfo
-from client.feature_auto_play.auto_play import auto_select_cards
-from client import playingrules
-import utils
+from core.card import Card, Suits, generate_cards
+from core.FieldInfo import FieldInfo
+from core.auto_play.strategy import auto_select_cards
+from core import playingrules
+from cli.card_utils import calculate_score, cards_to_strs
 
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "auto_play_logs")
@@ -163,11 +163,11 @@ class LocalGameSimulator:
         self.users_played_cards[player] = list(played)
 
         # 统计这一手牌自身携带的分数（5、10、K）并临时累加到 now_score
-        gained = utils.calculate_score(played)
+        gained = calculate_score(played)
         self.now_score += gained
         self._current_trick_records.append((player, list(played)))
 
-        cli_cards = utils.cards_to_strs(played)
+        cli_cards = cards_to_strs(played)
         self._write_log(
             f"[TURN] Player{player} PLAY {cli_cards}, gained_score={gained}, now_score={self.now_score}, remain={self.users_cards_num[player]}"
         )

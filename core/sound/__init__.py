@@ -2,14 +2,14 @@ import os
 import threading
 import platform
 import subprocess
-import utils
+from cli.terminal_utils import fatal
 
 def check_sound_player():
     def __checker(cmd: list[str], obj: str):
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
         except:
-            utils.fatal(f'This game needs "{obj}" to play sound, please install it')
+            fatal(f'This game needs "{obj}" to play sound, please install it')
     
     if platform.system() == "Darwin":
         __checker(["afplay"], "afplay")

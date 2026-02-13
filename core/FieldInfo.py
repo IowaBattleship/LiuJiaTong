@@ -1,4 +1,4 @@
-from card import Card
+from core.card import Card
 
 class FieldInfo:
     def __init__(

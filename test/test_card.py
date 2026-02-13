@@ -4,7 +4,7 @@ import sys
 import pickle
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from card import Card, Suits
+from core.card import Card, Suits
 
 class TestCard(unittest.TestCase):
     def test_init(self):

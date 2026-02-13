@@ -3,5 +3,5 @@ __pycache__
 .vscode
 
 LiuJiaTong.json
-
+client/build
 /log

@@ -1,8 +1,8 @@
 from typing import List, Dict, Iterable, Optional
 
-from card import Card
-from client.FieldInfo import FieldInfo
-from client import playingrules
+from core.card import Card
+from core.FieldInfo import FieldInfo
+from core import playingrules
 
 
 def _group_by_value(cards: List[Card]) -> Dict[int, List[Card]]:

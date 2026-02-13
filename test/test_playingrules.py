@@ -4,9 +4,9 @@ import pytest
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from client.playingrules import *
+from core.playingrules import *
 import unittest
-from card import Card, Suits
+from core.card import Card, Suits
 
 @pytest.mark.parametrize('user_input, expect', [
     [[15,15,15,15], (CardType.normal_bomb, 15)],

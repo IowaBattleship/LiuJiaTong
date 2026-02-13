@@ -4,10 +4,10 @@ import tkinter as tk
 from PIL import Image, ImageTk, ImageDraw
 from logging import Logger
 
-from card import Card, Suits
-from FieldInfo import FieldInfo
-import utils
-import playingrules
+from core.card import Card, Suits
+from core.FieldInfo import FieldInfo
+from cli.card_utils import int_to_str, calculate_team_scores
+from core import playingrules
 
 # This module-level card_queue will be injected by gui.run_tkinter_gui.
 card_queue = None
@@ -113,11 +113,11 @@ class ImageCache:
     def _load_card_image(self, card: Card, target_height: int) -> ImageTk.PhotoImage:
         """Load card from disk and resize. J/Q/K/A use int_to_str for filename."""
         if card.suit == Suits.empty:
-            path = "client/images/JOKER-B.png" if card.value == 16 else "client/images/JOKER-A.png"
+            path = "client/src/assets/JOKER-B.png" if card.value == 16 else "client/src/assets/JOKER-A.png"
         elif card.value > 10:
-            path = "client/images/" + card.suit.value + utils.int_to_str(card.value) + ".png"
+            path = "client/src/assets/" + card.suit.value + int_to_str(card.value) + ".png"
         else:
-            path = "client/images/" + card.suit.value + str(card.value) + ".png"
+            path = "client/src/assets/" + card.suit.value + str(card.value) + ".png"
         image = Image.open(path)
         w, h = image.size
         scale = target_height / h
@@ -127,7 +127,7 @@ class ImageCache:
     def get_background_image(self, target_height: int) -> ImageTk.PhotoImage:
         """Return cached or freshly loaded card-back image."""
         if self._background_cache is None or self._background_cache[0] != target_height:
-            image = Image.open("client/images/Background.png")
+            image = Image.open("client/src/assets/Background.png")
             w, h = image.size
             image = image.resize((int(w * target_height / h), target_height))
             self._background_cache = (target_height, ImageTk.PhotoImage(image))
@@ -671,7 +671,7 @@ class GUI:
     def _draw_scores(self):
         layout = self._get_layout()
         client_id = self.field_info.client_id
-        my_team, opp_team = utils.calculate_team_scores(
+        my_team, opp_team = calculate_team_scores(
             self.field_info.head_master, client_id, self.field_info.users_cards_num, self.field_info.user_scores
         )
         now_player = self._truncate_name(self.field_info.user_names[self.field_info.now_player], 6)

@@ -1,8 +1,8 @@
 import copy
 from collections import Counter
 from enum import Enum
-from card import Card
-import logger
+from core.card import Card
+import core.logger as logger
 
 '''
 3 ~ 15 -> 3 ~ 10 + J Q K A 2

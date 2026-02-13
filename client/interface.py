@@ -1,295 +1,74 @@
-from sound import playsound, playsounds
-from playingrules import judge_and_transform_cards, CardType
-from terminal_printer import *
-import utils
-import copy
-from card import Card
-from FieldInfo import FieldInfo
-from gui import update_gui
+"""
+客户端用户接口抽象层：通过消息传递机制通知 UI 更新，不直接依赖 CLI 或 GUI 实现。
+"""
+import threading
+from core.sound import playsound, playsounds
+from core.playingrules import judge_and_transform_cards, CardType
+from core.card import Card
+from core.FieldInfo import FieldInfo
+from gui import update_gui, init_gui, UIFramework
+from cli.terminal_utils import disable_echo, enable_echo
 
-INTERFACE_TYPE = "CLI" # "CLI" or "GUI", default "CLI"
+INTERFACE_TYPE = "CLI"
+_MODE_CLI = "CLI"
+_MODE_GUI = "GUI"
+_MODE_GUI_FLET = "GUI_FLET"
+
+_ui_handler = None
+
 
 def set_interface_type(type: str):
     global INTERFACE_TYPE
     INTERFACE_TYPE = type
 
+
 def get_interface_type() -> str:
     return INTERFACE_TYPE
 
-def gen_paragraph(string: str) -> Paragraph:
-    sentence = Sentence()
-    sentence.string = string
-    return [sentence]
 
-def gen_waiting_hall_header_chapter() -> Chapter:
-    chapter = [
-        gen_paragraph("等待大厅"),
-    ]
-    return chapter
+def set_ui_handler(handler):
+    """注册 UI 处理器，用于接收等待大厅、牌局、游戏结束等通知。"""
+    global _ui_handler
+    _ui_handler = handler
 
-def gen_waiting_hall_users_chapter(users_name, users_error) -> Chapter:
-    chapter = []
-    
-    for i in range(len(users_name)):
-        paragraph = []
 
-        user_name = Sentence()
-        user_name.string = users_name[i]
-        paragraph.append(user_name)
+def get_ui_handler():
+    return _ui_handler
 
-        user_error = Sentence()
-        user_error.string = "离线" if users_error[i] else "在线"
-        user_error.highlight = True
-        user_error.color = 31 if users_error[i] else 32
-        paragraph.append(user_error)
 
-        chapter.append(paragraph)
+def waiting_hall_interface(users_name, users_error) -> None:
+    """通知 UI 更新等待大厅信息。"""
+    if _ui_handler and hasattr(_ui_handler, "on_waiting_hall"):
+        _ui_handler.on_waiting_hall(users_name, users_error)
 
-    return chapter
-
-def waiting_hall_interface(th: TerminalHandler, users_name, users_error):
-    header_chapter = gen_waiting_hall_header_chapter()
-    users_chapter = gen_waiting_hall_users_chapter(users_name, users_error)
-    
-    article = [
-        header_chapter,
-        users_chapter,
-    ]
-    th.reset_cursor()
-    th.update_max_column(article_columns(article))
-    print_article(article, th)
-
-def gen_help_chapter() -> Chapter:
-    chapter = [
-        gen_paragraph("B 代表 10  0 代表 小王  1 代表 大王"),
-        gen_paragraph("tab键 补全牌  C键 清空手中的牌"),
-        gen_paragraph("左右方向键 改变输入的位置"),
-    ]
-    return chapter
-
-def gen_score_chapter(
-    now_score: int,
-    client_player: int,
-    users_score
-) -> Chapter :
-    chapter = []
-
-    def gen_field_score() -> Paragraph:
-        prompt = Sentence()
-        prompt.string = '当前场上分数:'
-        score = Sentence()
-        score.string = f'{now_score}'
-        score.highlight = True
-        if now_score == 0:
-            score.highlight = False
-        elif now_score <= 30 :
-            score.color = 34
-        elif now_score <= 80:
-            score.color = 33
-        else:
-            score.color = 33
-            score.blink = True
-            score.underline = True
-        return [prompt, score]
-    chapter.append(gen_field_score())
-
-    def gen_team_score() -> Paragraph:
-        paragraph = []
-        
-        own_score = Sentence()
-        score = 0
-        for i in range(6):
-            if i % 2 == client_player % 2:
-                score += users_score[i]
-        own_score.string = f'己方得分: {score}'
-        own_score.highlight = True
-        own_score.color = 32
-        paragraph.append(own_score)
-
-        opp_score = Sentence()
-        score = 0
-        for i in range(6):
-            if i % 2 != client_player % 2:
-                score += users_score[i]
-        opp_score.string = f'对方得分: {score}'
-        opp_score.highlight = True
-        opp_score.color = 31
-        paragraph.append(opp_score)
-        return paragraph
-    chapter.append(gen_team_score())
-
-    return chapter
-    
-# 生成手牌字符串
-def gen_cards_string(cards: list[str]) -> str:
-    string = ''
-    for i in range(len(cards)):
-        # 11/03/2024: 支持花色
-        # 不同的牌之间用空格隔开
-        if i != 0 and cards[i].get_cli_str() != cards[i - 1].get_cli_str():
-            string += ' '
-        string += cards[i].get_cli_str()
-    return string
-
-def gen_player_field_paragraph(
-    name: str,
-    name_maxlen: int,
-    num_of_cards: int,
-    score: int,
-    played_cards,
-    is_current_player: bool,
-    is_head_master: bool,
-    is_same_team: bool,
-    is_last_player: bool
-) -> Paragraph:
-    paragraph = []
-
-    def set_color(sentence: Sentence):
-        # 如果是同一队的，就用绿色输出，否则用红色
-        if is_same_team:
-            sentence.color = 32
-        else:
-            sentence.color = 31
-        sentence.highlight = True
-
-    head_master = Sentence()
-    head_master.minwidth = 4
-    if is_head_master:
-        head_master.string += '头科'
-        set_color(head_master)
-    paragraph.append(head_master)
-
-    player_name = Sentence()
-    player_name.minwidth = name_maxlen
-    set_color(player_name)
-
-    # 如果该玩家已经逃出，则将其名字打上删除线
-    if num_of_cards == 0:
-        player_name.strikethrough = True
-
-    # 如果该玩家现在在打牌，则将其名字闪烁显示并加上*
-    if is_current_player:
-        player_name.blink = True
-    player_name.string += name
-    paragraph.append(player_name)
-
-    player_score = Sentence()
-    set_color(player_score)
-    player_score.string += f'{num_of_cards:>2}张{score:>3}分'
-    paragraph.append(player_score)
-
-    player_played_cards = Sentence()
-    player_played_cards.minwidth = 20
-    if is_last_player:
-        player_played_cards.underline = True 
-    player_played_cards.string += gen_cards_string(played_cards)
-    paragraph.append(player_played_cards)
-
-    return paragraph
-
-def gen_player_cards_paragraph(user_cards) -> Paragraph:
-    return gen_paragraph(gen_cards_string(user_cards))
-
-def gen_cards_chapter(is_player, client_cards) -> Chapter:
-    chapter = [
-        gen_paragraph("你的手牌" + ("(旁观)" if not is_player else "") + ":"),
-        gen_paragraph(gen_cards_string(client_cards))
-    ]
-    return chapter
 
 def main_interface(
-    # 客户端变量
-    is_start,
-    is_player,
-    client_cards,
-    client_player: int, # 当前玩家的ID
-    # 场面信息
-    users_name,
-    users_score,
-    users_cards_num,
-    users_cards,
-    users_played_cards,
-    head_master,
-    # 运行时数据
-    now_score,
-    now_player,
-    last_player,
-    # 历史数据
-    his_now_score, 
-    his_last_player,
-):
-    # 输出帮助
-    help_chapter = gen_help_chapter()
+    is_start, is_player, client_cards, client_player: int,
+    users_name, users_score, users_cards_num, users_cards,
+    users_played_cards, head_master, now_score, now_player, last_player,
+    his_now_score, his_last_player,
+) -> None:
+    """通知 UI 更新牌局信息。"""
+    field_info = FieldInfo(
+        is_start, is_player, client_player, client_cards,
+        users_name, users_score, users_cards_num, users_cards,
+        users_played_cards, head_master, now_score, now_player,
+        last_player, his_now_score, his_last_player,
+    )
 
-    # 输出得分
-    score_chapter = gen_score_chapter(now_score, client_player, users_score)
-    __users_name = copy.deepcopy(users_name)
-    for i in range(6):
-        __users_name[i] = " " + ("*" if i == now_player else "") + __users_name[i] + " "
-    name_maxlen = 10
-    for i in range(6):
-        name_maxlen = max(name_maxlen, columns(__users_name[i]))
-
-    # 输出其它玩家
-    other_player_chapter = []
-    client_player_chapter = []
-    for i in range(0, 6):
-        player = (client_player + i + 1) % 6
-        player_field_paragraph = gen_player_field_paragraph(
-            name=__users_name[player],
-            name_maxlen=name_maxlen,
-            num_of_cards=users_cards_num[player],
-            score=users_score[player],
-            played_cards=users_played_cards[player],
-            is_current_player=(player == now_player),
-            is_head_master=(player == head_master),
-            is_same_team=(player % 2 == client_player % 2),
-            is_last_player=(player == last_player)
-        )
-        if player == client_player:
-            client_player_chapter.append(player_field_paragraph)
-        else:
-            other_player_chapter.append(player_field_paragraph)
-
-        if users_cards[player] == []:
-            continue
-        player_cards_paragraph = gen_player_cards_paragraph(users_cards[player])
-        if player != client_player:
-            other_player_chapter.append(player_cards_paragraph)
-
-    cards_chapter = gen_cards_chapter(is_player, client_cards)
-
-    """
-    一共五部分，从上到下依次为
-    1. 帮助注释
-    2. 得分
-    3. 其他玩家信息
-    4. 自己信息
-    5. 手牌
-    """
-    article = [
-        help_chapter,
-        score_chapter,
-        other_player_chapter,
-        client_player_chapter,
-        cards_chapter,
-    ]
-
-    # 最后的输出
-    th = TerminalHandler()
-    th.update_max_column(article_columns(article))
-    th.clear_screen_all() # 清屏
-    th.move_cursor() # 移动光标
-
-    if INTERFACE_TYPE == "CLI":
-        print_article(article, th) # 打印
+    if _ui_handler and hasattr(_ui_handler, "on_field_info"):
+        _ui_handler.on_field_info(field_info)
     else:
-        field_info = FieldInfo(
-            is_start, is_player, client_player, client_cards, 
-            users_name, users_score, users_cards_num, users_cards, 
-            users_played_cards, head_master, now_score, now_player, 
-            last_player, his_now_score, his_last_player)
+        # 回退：直接推送到 GUI（兼容 gui_flet 独立启动等场景）
+        from gui import update_gui
         update_gui(field_info)
+        try:
+            import sys
+            gf = sys.modules.get("gui_flet.gui_flet")
+            if gf is not None and hasattr(gf, "_update_queue"):
+                gf._update_queue.put(field_info)
+        except Exception:
+            pass
 
     _play_sound(
         is_start=is_start,
@@ -297,8 +76,9 @@ def main_interface(
         now_player=now_player,
         his_last_player=his_last_player,
         his_now_score=his_now_score,
-        users_played_cards=users_played_cards
+        users_played_cards=users_played_cards,
     )
+
 
 def _play_sound(
     is_start: bool,
@@ -306,9 +86,8 @@ def _play_sound(
     now_player: int,
     his_last_player: int,
     his_now_score: int,
-    users_played_cards : list[list[Card]],
+    users_played_cards: list,
 ):
-    # 根据手牌判断播放的音效
     if not is_start:
         playsounds(["start", "open"], True)
     elif last_player == now_player and his_now_score > 0:
@@ -323,7 +102,7 @@ def _play_sound(
         bombs = [
             CardType.black_joker_bomb,
             CardType.red_joker_bomb,
-            CardType.normal_bomb
+            CardType.normal_bomb,
         ]
         if cardtype in bombs:
             if len(last_played_cards) >= 7:
@@ -338,13 +117,81 @@ def _play_sound(
             else:
                 playsound("throw1", True, None)
 
-def game_over_interface(client_player, if_game_over):
-    if (client_player + 1) % 2 == (if_game_over + 2) % 2:
-        print('游戏结束，你的队伍获得了胜利', end='')
-        if if_game_over < 0:
-            print('，并成功双统')
+
+def game_over_interface(client_player: int, if_game_over: int) -> None:
+    """通知 UI 游戏结束。"""
+    if _ui_handler and hasattr(_ui_handler, "on_game_over"):
+        _ui_handler.on_game_over(client_player, if_game_over)
     else:
-        print('游戏结束，你的队伍未能取得胜利', end='')
-        if if_game_over < 0:
-            print('，并被对方双统')
-    playsound("clap", False, None)
+        from core.sound import playsound
+        if (client_player + 1) % 2 == (if_game_over + 2) % 2:
+            print("游戏结束，你的队伍获得了胜利", end="")
+            if if_game_over < 0:
+                print("，并成功双统")
+        else:
+            print("游戏结束，你的队伍未能取得胜利", end="")
+            if if_game_over < 0:
+                print("，并被对方双统")
+        playsound("clap", False, None)
+
+
+def run_client(client, mode: str) -> None:
+    """
+    根据 mode 启动客户端并运行游戏，负责接口类型设置、GUI 初始化及连接/运行逻辑。
+    mode: "CLI" | "GUI" | "GUI_FLET"
+    """
+    mode = (mode or _MODE_CLI).upper()
+    if mode not in (_MODE_CLI, _MODE_GUI, _MODE_GUI_FLET):
+        client.logger.warning("未知 mode %r，回退到 CLI", mode)
+        mode = _MODE_CLI
+
+    if mode == _MODE_CLI:
+        from cli.interface_cli import create_cli_handler
+        from core.sound import playsound
+        set_ui_handler(create_cli_handler(playsound))
+    elif mode in (_MODE_GUI, _MODE_GUI_FLET):
+        set_ui_handler(_create_gui_handler())
+
+    def _do_run():
+        client.connect(client.config.ip, client.config.port)
+        disable_echo()
+        client.run()
+        enable_echo()
+        client.close()
+
+    if mode == _MODE_GUI:
+        client.logger.info("启动GUI模式 (tkinter)")
+        set_interface_type("GUI")
+        init_gui(client.logger, UIFramework.TKINTER)
+        _do_run()
+    elif mode == _MODE_GUI_FLET:
+        client.logger.info("启动GUI模式 (flet)")
+        set_interface_type("GUI")
+        init_gui(client.logger, UIFramework.FLET, client=client)
+    else:
+        client.logger.info("启动命令行模式")
+        _do_run()
+
+
+def _create_gui_handler():
+    """创建 GUI 端处理器：将 on_field_info 转发给 update_gui。"""
+
+    class GUIHandler:
+        def on_waiting_hall(self, users_name, users_error):
+            pass  # GUI 由自身流程处理等待大厅
+
+        def on_field_info(self, field_info):
+            update_gui(field_info)
+            try:
+                import sys
+                gf = sys.modules.get("gui_flet.gui_flet")
+                if gf is not None and hasattr(gf, "_update_queue"):
+                    gf._update_queue.put(field_info)
+            except Exception:
+                pass
+
+        def on_game_over(self, client_player: int, if_game_over: int):
+            from core.sound import playsound
+            playsound("clap", False, None)
+
+    return GUIHandler()

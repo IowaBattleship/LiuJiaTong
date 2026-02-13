@@ -1,9 +1,9 @@
 import random
 import copy
 import threading
-import logger
+import core.logger as logger
 
-import card as card
+from core import card
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
 

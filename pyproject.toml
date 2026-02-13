@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "liujiatong-client"
+version = "1.0.0"
+description = "六家统客户端 - Flet 图形界面"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=0.25.0",
+]
+
+[tool.flet.app]
+# Flet 应用入口：符合 flet create 标准结构 (src/main.py + src/assets/)
+path = "src"
+module = "main"

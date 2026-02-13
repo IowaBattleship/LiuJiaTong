@@ -8,7 +8,7 @@ import queue
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from my_network import send_data_to_socket, recv_data_from_socket
-from card import HEART_JACK
+from core.card import HEART_JACK
 
 def start_server(host, port, server_socket, conn_queue):
     server_socket.bind((host, port))

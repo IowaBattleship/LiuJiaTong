@@ -11,12 +11,15 @@ def __check_logger_dir():
     if os.access(LOGGER_DIR, os.F_OK) is False:
         os.mkdir(LOGGER_DIR)
 
-    # 清除过期日志
+    # 清除过期日志（跳过被其他进程占用的文件，避免 PermissionError）
     for filename in os.listdir(LOGGER_DIR):
         filepath = os.path.join(LOGGER_DIR, filename)
-        stat = os.stat(filepath)
-        if time.time() - stat.st_atime > 600:
-            os.remove(filepath)
+        try:
+            stat = os.stat(filepath)
+            if time.time() - stat.st_atime > 600:
+                os.remove(filepath)
+        except (PermissionError, OSError):
+            pass  # 文件被占用或无法删除时跳过
 
 def init_logger():
     __check_logger_dir()

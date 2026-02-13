@@ -1,15 +1,16 @@
 import os
 import sys
 import time
-import logger
+import core.logger as logger
 from logging import Logger
-import utils
+from cli.card_utils import str_to_int, get_card_count, strs_to_ints, calculate_score, draw_cards
+from cli.terminal_utils import fatal
 from enum import Enum, auto
-from playingrules import validate_user_input
-from terminal_printer import *
-import sound
-from card import Card
-from FieldInfo import FieldInfo
+from core.playingrules import validate_user_input
+from cli.terminal_printer import *
+from core import sound
+from core.card import Card
+from core.FieldInfo import FieldInfo
 import queue
 from gui import card_queue
 
@@ -113,7 +114,7 @@ if os.name == 'posix':
             return SpecialInput.backspace
         elif fst_byte in ['\n', '\t', 'C', 'F']:
             return fst_byte
-        elif utils.str_to_int(fst_byte) != -1:
+        elif str_to_int(fst_byte) != -1:
             return fst_byte
         else:
             raise InputException('(非法输入)')
@@ -147,12 +148,12 @@ elif os.name == 'nt':
             return read_direction(if_blocking)
         fst_byte = fst_byte.upper()
         if fst_byte == '\x03':
-            utils.fatal("Keyboard Interrupt")
+            fatal("Keyboard Interrupt")
         elif fst_byte == '\x08':
             return SpecialInput.backspace
         elif fst_byte in ['\r', '\t', 'C', 'F']:
             return fst_byte
-        elif utils.str_to_int(fst_byte) != -1:
+        elif str_to_int(fst_byte) != -1:
             return fst_byte
         else:
             raise InputException('(非法输入)')
@@ -166,7 +167,7 @@ def prepare_input_buffer():
             g_input_buffer.append(read_input(if_blocking=False))
     except InputException:
         g_input_buffer = [x for x in g_input_buffer if x not in ['\r', '\n']]
-        import logger
+        import core.logger as logger
         logger.info(f"{g_input_buffer}")
 
 def read_input_buffer():
@@ -210,7 +211,7 @@ def read_userinput(client_cards: list[Card]) -> list[str]:
                 if th.cursor > 0:
                     fill_char = th.new_played_cards[th.cursor - 1]
                     used_num = th.new_played_cards.count(fill_char)
-                    total_num = utils.get_card_count(client_cards, fill_char)
+                    total_num = get_card_count(client_cards, fill_char)
                     fill_num = total_num - used_num
                     assert (fill_num >= 0)
                     th.new_played_cards = th.new_played_cards[:th.cursor] + fill_num * [fill_char] + th.new_played_cards[th.cursor:]
@@ -222,7 +223,7 @@ def read_userinput(client_cards: list[Card]) -> list[str]:
                 th.new_played_cards = []
                 th.cursor = 0
             else: # 输入一张牌
-                user_card_count = utils.get_card_count(client_cards, input)
+                user_card_count = get_card_count(client_cards, input)
                 assert(th.new_played_cards.count(input) <= user_card_count)
                 if th.new_played_cards.count(input) == user_card_count:
                     raise InputException('(你打出的牌超过上限了)')
@@ -257,7 +258,7 @@ def get_legal_user_input_from_cli(
         tcp_handler.logger.info(f"Last Player: {last_player}. Played: {[str(c) for c in users_played_cards[last_player]] if last_player != client_id else None}")
         tcp_handler.logger.info(f"Client Player: {client_id}")
         legal_input, new_score = validate_user_input(
-            utils.strs_to_ints(user_input),
+            strs_to_ints(user_input),
             client_cards,
             users_played_cards[last_player] if last_player != client_id else None
         )
@@ -277,7 +278,7 @@ def get_leagal_user_input_from_gui() -> tuple[list[Card], int]:
             if selected_cards == ['F']:
                 return ['F'], 0
             else:
-                return selected_cards, utils.calculate_score(selected_cards)
+                return selected_cards, calculate_score(selected_cards)
         except queue.Empty:
             # 如果队列为空，继续等待
             continue
@@ -300,9 +301,10 @@ def playing(
     global g_terminal_handler
     g_terminal_handler = PlayingTerminalHandler()
     
-    from interface import INTERFACE_TYPE
-    tcp_handler.logger.info(f"Interface type: {INTERFACE_TYPE}")
-    if INTERFACE_TYPE == "CLI":
+    from client.interface import get_interface_type
+    interface_type = get_interface_type()
+    tcp_handler.logger.info(f"Interface type: {interface_type}")
+    if interface_type == "CLI":
         print('请输入要出的手牌(\'F\'表示跳过):')
         user_input, new_score = get_legal_user_input_from_cli(client_cards, last_player, client_player, users_played_cards, tcp_handler)
         if user_input == ['F']:
@@ -310,7 +312,7 @@ def playing(
         else:
             # 返回用户每种牌的前n张
             # 根据用户输入的字符串，返回用户打出的牌
-            new_played_cards = utils.draw_cards(client_cards, user_input)
+            new_played_cards = draw_cards(client_cards, user_input)
     else:
         tcp_handler.logger.info("get_leagal_user_input_from_gui")
         new_played_cards, new_score = get_leagal_user_input_from_gui()

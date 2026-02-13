@@ -5,24 +5,28 @@ import sys
 import asyncio
 import queue
 import logging
+import threading
 import time
 from logging import Logger
 
-# Ensure project root in path
-_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_client_dir = os.path.join(_project_root, "client")
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
+if _client_dir not in sys.path:
+    sys.path.insert(0, _client_dir)  # gui、interface 等模块在 client 下
 
-import logger as logger_module
+import core.logger as logger_module
 import flet as ft
-from card import Card, Suits
-from FieldInfo import FieldInfo
-import utils
-import playingrules
-from feature_auto_play.auto_play import auto_select_cards
+from core.card import Card, Suits
+from core.FieldInfo import FieldInfo
+from cli.card_utils import int_to_str, calculate_team_scores
+from cli.terminal_utils import disable_echo, enable_echo
+from core import playingrules
+from core.auto_play.strategy import auto_select_cards
 
-# Import card_queue from parent gui for compatibility (set when FLET is selected)
 def _get_card_queue():
+    """从 client.gui 获取 card_queue（FLET 模式选牌时使用）。"""
     from gui import card_queue
     return card_queue
 
@@ -64,16 +68,25 @@ SCORE_LABEL_FONT = 13
 # Player position offsets
 PLAYER_OFFSET_SE, PLAYER_OFFSET_NE, PLAYER_OFFSET_TOP, PLAYER_OFFSET_NW, PLAYER_OFFSET_SW = 1, 2, 3, 4, 5
 
-_images_dir = os.path.join(_project_root, "client", "images")
+_images_dir = os.path.join(_project_root, "core", "assets")
 
 _gui_flet_logger = None
+
+
+def _run_client_thread(client) -> None:
+    """在后台线程中运行客户端网络循环。"""
+    client.connect(client.config.ip, client.config.port)
+    disable_echo()
+    client.run()
+    enable_echo()
+    client.close()
 
 def _card_image_path(card: Card, target_height: int) -> str:
     """Return absolute path to card image for Flet."""
     if card.suit == Suits.empty:
         name = "JOKER-B.png" if card.value == 16 else "JOKER-A.png"
     elif card.value > 10:
-        name = card.suit.value + utils.int_to_str(card.value) + ".png"
+        name = card.suit.value + int_to_str(card.value) + ".png"
     else:
         name = card.suit.value + str(card.value) + ".png"
     return os.path.abspath(os.path.join(_images_dir, name))
@@ -160,20 +173,26 @@ class LayoutParams:
         self.lower_info_section_y = self.lower_card_y + self.info_section_offset
 
 _update_queue = queue.Queue()
+# 由 init_gui_flet 设置，供 main() 创建 FletGUI 时获取 client
+_flet_client = None
+
 
 class FletGUI:
     """Main Flet GUI controller. Holds field state and draws all game elements.
     Mirrors gui.GUI structure (tkinter)."""
 
-    def __init__(self, page: ft.Page | None, logger: Logger):
+    def __init__(self, page: ft.Page | None, logger: Logger, client=None):
         self.page = page
         self.logger = logger
+        self.client = client or _flet_client  # 由 init_gui_flet 传入
         self.field_info: FieldInfo | None = None  # Updated on each round
         self.selected_card_flag: list[bool] = []  # Per-card selection state
         self.content_stack: ft.Stack | None = None  # Game content container, set when page exists
         # 托管相关状态：是否开启托管、以及上一轮自动出牌时的状态快照，防止重复自动出牌
         self.auto_play_enabled: bool = False
         self._last_auto_play_state: tuple | None = None
+        # 开始界面状态："has_config" 有配置，"no_config" 无配置，"waiting" 已连接等待大厅
+        self._start_screen_state: str = "no_config"
 
         if page is not None:
             self._setup_page()
@@ -198,7 +217,118 @@ class FletGUI:
         )
         page.add(main_container)
 
-        # Initial placeholder until first FieldInfo update
+        # 开始界面：根据 client.config 显示不同内容
+        self._update_start_screen()
+        # Rebuild layout when window is resized so all controls stay aligned.
+        page.on_resize = self._on_page_resize
+        page.update()
+
+    def _update_start_screen(self) -> None:
+        """根据当前状态更新开始界面内容。"""
+        if self.content_stack is None:
+            return
+        self.content_stack.controls = [self._build_start_screen_container()]
+        self.page.update()
+
+    def _build_start_screen_container(self) -> ft.Container:
+        """构建开始界面（有配置时显示 加入房间/退出登录，无配置时显示输入表单）。
+        当 client 为 None 时（如从 __main__ 启动、客户端已预先连接），直接显示等待大厅。"""
+        if self.client is None:
+            return ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("六家统", size=32, weight=ft.FontWeight.BOLD, color=PLAYER_CARD_TEXT_COLOR),
+                        ft.Text("等待游戏开始...", size=18, color="#a0a0a0"),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    expand=True,
+                ),
+                alignment=ft.Alignment.CENTER,
+                expand=True,
+            )
+        if self.client.config is not None:
+            self._start_screen_state = "has_config"
+            content = self._build_start_screen_with_config()
+        else:
+            self._start_screen_state = "no_config"
+            content = self._build_start_screen_input_form()
+        return ft.Container(
+            content=content,
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+        )
+
+    def _build_start_screen_with_config(self) -> ft.Column:
+        """有配置时：显示服务器信息和用户名，以及 加入房间、退出登录 按钮。"""
+        cfg = self.client.config
+        return ft.Column(
+            [
+                ft.Text("六家统", size=32, weight=ft.FontWeight.BOLD, color=PLAYER_CARD_TEXT_COLOR),
+                ft.Text("欢迎回来", size=20, color="#a0a0a0"),
+                ft.Container(height=20),
+                ft.Text(f"服务器: {cfg.ip}:{cfg.port}", size=16, color=PLAYER_CARD_TEXT_COLOR),
+                ft.Text(f"用户名: {cfg.name}", size=16, color=PLAYER_CARD_TEXT_COLOR),
+                ft.Container(height=30),
+                ft.Row(
+                    [
+                        ft.ElevatedButton("加入房间", on_click=lambda e: self._on_join_room(e)),
+                        ft.OutlinedButton("退出登录", on_click=lambda e: self._on_logout(e)),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=20,
+                ),
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.CENTER,
+        )
+
+    def _build_start_screen_input_form(self) -> ft.Column:
+        """无配置时：输入框（IP、端口、用户名）+ 确认连接。"""
+        ip_field = ft.TextField(label="服务器地址", hint_text="如 192.168.1.100", width=280)
+        port_field = ft.TextField(label="端口", hint_text="如 8081", width=280, keyboard_type=ft.KeyboardType.NUMBER)
+        name_field = ft.TextField(label="用户名", hint_text="请输入用户名", width=280)
+
+        def on_confirm(e):
+            ip = (ip_field.value or "").strip()
+            port_str = (port_field.value or "").strip()
+            name = (name_field.value or "").strip()
+            if not ip or not port_str or not name:
+                # 可在此添加错误提示
+                return
+            try:
+                port = int(port_str)
+            except ValueError:
+                return
+            from core.config import Config
+            self.client.config = Config(ip, port, name)
+            self.client.config.dump()
+            self.client.init_logger()
+            self._on_join_room(e)
+
+        return ft.Column(
+            [
+                ft.Text("六家统", size=32, weight=ft.FontWeight.BOLD, color=PLAYER_CARD_TEXT_COLOR),
+                ft.Text("请输入服务器信息", size=18, color="#a0a0a0"),
+                ft.Container(height=30),
+                ip_field,
+                port_field,
+                name_field,
+                ft.Container(height=20),
+                ft.ElevatedButton("确认连接", on_click=on_confirm),
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=12,
+        )
+
+    def _on_join_room(self, e) -> None:
+        """加入房间：启动客户端线程并进入等待大厅。"""
+        if not self.client or not self.client.config:
+            return
+        self._start_screen_state = "waiting"
+        t = threading.Thread(target=_run_client_thread, args=(self.client,), daemon=True)
+        t.start()
         self.content_stack.controls = [
             ft.Container(
                 content=ft.Column(
@@ -214,9 +344,13 @@ class FletGUI:
                 expand=True,
             )
         ]
-        # Rebuild layout when window is resized so all controls stay aligned.
-        page.on_resize = self._on_page_resize
-        page.update()
+        self.page.update()
+
+    def _on_logout(self, e) -> None:
+        """退出登录：清空配置并显示输入表单。"""
+        if self.client:
+            self.client.clear_config()
+        self._update_start_screen()
 
     def update(self, info: FieldInfo) -> None:
         """Public method: push new field info to update queue (client thread safe)."""
@@ -601,7 +735,7 @@ class FletGUI:
         if _gui_flet_logger:
             _gui_flet_logger.info("_build_score_panel: client_id=%s, now_score=%s", info.client_id, info.now_score)
         client_id = info.client_id
-        my_team, opp_team = utils.calculate_team_scores(
+        my_team, opp_team = calculate_team_scores(
             info.head_master, client_id, info.users_cards_num, info.user_scores
         )
         now_player = _truncate_name(info.user_names[info.now_player], 6)
@@ -915,7 +1049,7 @@ async def main(page: ft.Page):
     if _gui_flet_logger:
         _gui_flet_logger.info("main: Flet page started")
 
-    gui = FletGUI(page, _gui_flet_logger or logging.getLogger("gui_flet"))
+    gui = FletGUI(page, _gui_flet_logger or logging.getLogger("gui_flet"), client=_flet_client)
     # IMPORTANT: use the same `gui` module as __main__ (`from gui import ...`)
     # to avoid creating two separate module instances (`gui` vs `client.gui`)
     # which would desynchronise GUI state and pending updates.
@@ -926,14 +1060,17 @@ async def main(page: ft.Page):
     gui_module.register_gui_fully_ready()
 
 
-def init_gui_flet(client_logger: Logger) -> None:
-    """Start Flet GUI. Must run in main thread (Flet uses signal.signal). Blocks until window closes."""
-    global _gui_flet_logger
+def init_gui_flet(client_logger: Logger, client=None) -> None:
+    """Start Flet GUI. Must run in main thread (Flet uses signal.signal). Blocks until window closes.
+    client: Client 实例，用于开始界面（加载/清空配置、连接）。若为 None 则不显示开始界面。
+    """
+    global _gui_flet_logger, _flet_client
     _gui_flet_logger = client_logger
+    _flet_client = client
     client_logger.info("init_gui_flet: Starting Flet GUI (main thread)")
 
     # Same reason as above: keep a single shared `gui` module.
     import gui as gui_module
-    gui_module.register_gui_proxy(FletGUI(None, client_logger))
+    gui_module.register_gui_proxy(FletGUI(None, client_logger, client=client))
 
-    ft.app(target=main, assets_dir=os.path.join(_project_root, "client", "images"))
+    ft.app(target=main, assets_dir=os.path.join(_project_root, "client", "src", "assets"))

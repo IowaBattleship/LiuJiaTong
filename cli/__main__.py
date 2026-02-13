@@ -6,21 +6,21 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import utils
-utils.check_packages({
+from cli.terminal_utils import check_packages, user_confirm, error, success, fatal
+from cli.card_utils import last_played
+check_packages({
     "nt": [
         ("win32api", "pypiwin32"),
         ("win32con", "pypiwin32"),
     ],
 })
 import logging
-import logger
-from playing_handler import playing
-from terminal_printer import TerminalHandler
-from my_network import send_data_to_socket, recv_data_from_socket
-from interface import main_interface, game_over_interface, waiting_hall_interface
-from config import Config, CONFIG_NAME
-from card import Card
+import core.logger as logger
+from client.playing_handler import playing
+from network.my_network import send_data_to_socket, recv_data_from_socket
+from client.interface import main_interface, game_over_interface, waiting_hall_interface
+from core.config import Config, CONFIG_NAME
+from core.card import Card
 
 ASCII_ART = '''
     __    _              ___          ______                 
@@ -71,6 +71,30 @@ class Client:
         cards_str = [str(c) for c in self.client_cards]
         logger.info(f"client_cards: {cards_str}")
 
+    def load_config_silent(self) -> bool:
+        """
+        静默加载配置文件（无交互）。若文件存在且格式正确则加载并初始化 logger，返回 True；
+        否则返回 False。用于 GUI 模式下先尝试使用本地配置。
+        """
+        try:
+            with open(CONFIG_NAME, "r") as file:
+                data = json.load(file)
+                self.config = Config(data["ip"], int(data["port"]), data["name"], data.get("cookie"))
+            self.init_logger()
+            return True
+        except Exception:
+            self.config = None
+            return False
+
+    def clear_config(self) -> None:
+        """清空配置：删除配置文件并将 config 置为 None。"""
+        self.config = None
+        try:
+            if os.path.exists(CONFIG_NAME):
+                os.remove(CONFIG_NAME)
+        except Exception:
+            pass
+
     def load_config(self):
         """
         加载配置文件，并根据配置文件或用户输入初始化配置对象
@@ -90,7 +114,7 @@ class Client:
                 print(f"IP地址: {self.config.ip}")
                 print(f"端口:   {self.config.port}")
                 print(f"用户名: {self.config.name}")
-                if utils.user_confirm(prompt="是否使用配置？", default=True) is True:
+                if user_confirm(prompt="是否使用配置？", default=True) is True:
                     # 配置logger
                     self.init_logger()
                     break
@@ -151,14 +175,14 @@ class Client:
                 try_times += 1
                 self.client.connect((server_ip, server_port))
             except Exception as e:
-                utils.error(f"连接错误: {e}")
+                error(f"连接错误: {e}")
                 time.sleep(1)
             else:
                 if_connected = True
         if if_connected:
-            utils.success("连接成功")
+            success("连接成功")
         else:
-            utils.fatal("连接失败")
+            fatal("连接失败")
 
     # 关闭客户端
     def close(self):
@@ -182,7 +206,7 @@ class Client:
         # 重发cookie的同时还得同步用户名
         if_valid_cookie = recv_data_from_socket(self.client)
         if if_valid_cookie:
-            utils.success("cookie合法，开始恢复")
+            success("cookie合法，开始恢复")
             if_recovery = recv_data_from_socket(self.client)
             if if_recovery is False:
                 raise RuntimeError("恢复失败，是不是有客户端还在运行？")
@@ -193,12 +217,10 @@ class Client:
     
     # 接收等待大厅信息
     def recv_waiting_hall_info(self):
-        th = TerminalHandler()
         while True:
             self.users_name = recv_data_from_socket(self.client)
-            # 收集用户在线/离线信息
             users_error = recv_data_from_socket(self.client)
-            waiting_hall_interface(th, self.users_name, users_error)
+            waiting_hall_interface(self.users_name, users_error)
             if len(self.users_name) == 6:
                 break
 
@@ -240,7 +262,7 @@ class Client:
             return ret
         except Exception as e:
             self.close()
-            utils.fatal(f"{msg}: {e}")
+            fatal(f"{msg}: {e}")
 
     def run(self):
         """
@@ -266,7 +288,7 @@ class Client:
         while True:
             self.handle_connection_error(self.recv_round_info, "在游戏时与服务器链接失效(获取牌局信息)")
             # UI
-            last_player = utils.last_played(self.users_played_cards, self.now_player)
+            last_player = last_played(self.users_played_cards, self.now_player)
             # 这里需要额外考虑一个情况就是当一个人打完所有牌，所有玩家无法跟时
             # 历史的最后打牌人可能会发生不一致性，因为永远轮不到逃走的人打牌
             # 当一轮结束后，会移交给下一个可以打的人打牌，历史最后打牌人记录应该同步
