@@ -1,6 +1,9 @@
 import socket
 import json
-import tkinter as tk
+try:
+    import tkinter as tk
+except ImportError:
+    tk = None  # Android/iOS 无 tkinter，仅 GUI_KIVY 等模式可用
 import time
 import os
 import sys
