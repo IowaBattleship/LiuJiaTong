@@ -1073,4 +1073,4 @@ def init_gui_flet(client_logger: Logger, client=None) -> None:
     import gui as gui_module
     gui_module.register_gui_proxy(FletGUI(None, client_logger, client=client))
 
-    ft.app(target=main, assets_dir=os.path.join(_project_root, "client", "src", "assets"))
+    ft.app(target=main, assets_dir=os.path.join(_project_root, "core", "assets"))

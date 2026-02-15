@@ -5,3 +5,7 @@ __pycache__
 LiuJiaTong.json
 client/build
 /log
+/build
+core/log/
+flet-build-template/
+0.85.0

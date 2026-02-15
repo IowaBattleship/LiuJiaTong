@@ -11,6 +11,7 @@ class UIFramework(Enum):
     """UI framework options for the game interface."""
     TKINTER = "tkinter"
     FLET = "flet"
+    KIVY = "kivy"
 
 
 class GUIState(Enum):
@@ -125,6 +126,13 @@ def _start_flet_gui(logger: Logger, client=None) -> None:
     init_gui_flet(logger, client)
 
 
+def _start_kivy_gui(logger: Logger, client=None) -> None:
+    """Start the Kivy GUI in the main thread."""
+    from gui_kivy.gui_kivy import init_gui_kivy
+
+    init_gui_kivy(logger, client)
+
+
 def init_gui(logger: Logger, framework: UIFramework = UIFramework.TKINTER, client=None) -> None:
     """Entry point used by the client to bootstrap the GUI."""
     global _gui_logger
@@ -136,5 +144,7 @@ def init_gui(logger: Logger, framework: UIFramework = UIFramework.TKINTER, clien
         _start_tkinter_gui(logger)
     elif framework == UIFramework.FLET:
         _start_flet_gui(logger, client)
+    elif framework == UIFramework.KIVY:
+        _start_kivy_gui(logger, client)
     else:
         raise ValueError(f"Unknown UI framework: {framework}")

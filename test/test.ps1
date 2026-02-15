@@ -13,4 +13,4 @@ for ($i = 1; $i -le 5; $i++) {
 
 # 最后一个用户用于测试 Flet GUI 模式（client/src/main.py 入口，含开始界面）
 Start-Sleep -Milliseconds 500
-Start-Process PowerShell -ArgumentList "-NoExit", "-Command", "python -m client --ip $ip --port $port --user-name Redhat --mode GUI_FLET" -WorkingDirectory $projectRoot
+Start-Process PowerShell -ArgumentList "-NoExit", "-Command", "python -m client --ip $ip --port $port --user-name Redhat --mode GUI_KIVY" -WorkingDirectory $projectRoot

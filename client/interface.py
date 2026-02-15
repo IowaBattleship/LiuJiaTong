@@ -13,8 +13,21 @@ INTERFACE_TYPE = "CLI"
 _MODE_CLI = "CLI"
 _MODE_GUI = "GUI"
 _MODE_GUI_FLET = "GUI_FLET"
+_MODE_GUI_KIVY = "GUI_KIVY"
 
 _ui_handler = None
+_simulation_mode = False
+
+
+def set_simulation_mode(enabled: bool) -> None:
+    """开启/关闭模拟模式：自动出牌、跳过，不等待真实用户输入。"""
+    global _simulation_mode
+    _simulation_mode = enabled
+
+
+def is_simulation_mode() -> bool:
+    """是否处于模拟模式。"""
+    return _simulation_mode
 
 
 def set_interface_type(type: str):
@@ -138,10 +151,10 @@ def game_over_interface(client_player: int, if_game_over: int) -> None:
 def run_client(client, mode: str) -> None:
     """
     根据 mode 启动客户端并运行游戏，负责接口类型设置、GUI 初始化及连接/运行逻辑。
-    mode: "CLI" | "GUI" | "GUI_FLET"
+    mode: "CLI" | "GUI" | "GUI_FLET" | "GUI_KIVY"
     """
     mode = (mode or _MODE_CLI).upper()
-    if mode not in (_MODE_CLI, _MODE_GUI, _MODE_GUI_FLET):
+    if mode not in (_MODE_CLI, _MODE_GUI, _MODE_GUI_FLET, _MODE_GUI_KIVY):
         client.logger.warning("未知 mode %r，回退到 CLI", mode)
         mode = _MODE_CLI
 
@@ -149,7 +162,7 @@ def run_client(client, mode: str) -> None:
         from cli.interface_cli import create_cli_handler
         from core.sound import playsound
         set_ui_handler(create_cli_handler(playsound))
-    elif mode in (_MODE_GUI, _MODE_GUI_FLET):
+    elif mode in (_MODE_GUI, _MODE_GUI_FLET, _MODE_GUI_KIVY):
         set_ui_handler(_create_gui_handler())
 
     def _do_run():
@@ -168,6 +181,10 @@ def run_client(client, mode: str) -> None:
         client.logger.info("启动GUI模式 (flet)")
         set_interface_type("GUI")
         init_gui(client.logger, UIFramework.FLET, client=client)
+    elif mode == _MODE_GUI_KIVY:
+        client.logger.info("启动GUI模式 (kivy)")
+        set_interface_type("GUI")
+        init_gui(client.logger, UIFramework.KIVY, client=client)
     else:
         client.logger.info("启动命令行模式")
         _do_run()
@@ -187,6 +204,9 @@ def _create_gui_handler():
                 gf = sys.modules.get("gui_flet.gui_flet")
                 if gf is not None and hasattr(gf, "_update_queue"):
                     gf._update_queue.put(field_info)
+                gk = sys.modules.get("gui_kivy.gui_kivy")
+                if gk is not None and hasattr(gk, "_update_queue"):
+                    gk._update_queue.put(field_info)
             except Exception:
                 pass
 

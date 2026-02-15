@@ -283,6 +283,42 @@ def get_leagal_user_input_from_gui() -> tuple[list[Card], int]:
             # 如果队列为空，继续等待
             continue
 
+def _get_simulated_play(
+    client_cards: list[Card],
+    last_player: int,
+    client_player: int,
+    users_played_cards: list,
+) -> tuple[list[Card] | list[str], int]:
+    """模拟模式下由 auto_select_cards 自动选择出牌。"""
+    from core.auto_play.strategy import auto_select_cards
+    from core.FieldInfo import FieldInfo
+    from cli.card_utils import calculate_score
+
+    # 构造最小 FieldInfo 供 auto_select_cards 使用
+    last_played = users_played_cards[last_player] if last_player != client_player else None
+    info = FieldInfo(
+        start_flag=True,
+        is_player=True,
+        client_id=client_player,
+        client_cards=client_cards,
+        user_names=[""] * 6,
+        user_scores=[0] * 6,
+        users_cards_num=[0] * 6,
+        users_cards=[[]] * 6,
+        users_played_cards=users_played_cards,
+        head_master=-1,
+        now_score=0,
+        now_player=client_player,
+        last_player=last_player,
+        his_now_score=0,
+        his_last_player=None,
+    )
+    selected = auto_select_cards(info)
+    if selected is None:
+        return ["F"], 0
+    return selected, calculate_score(selected)
+
+
 # 从控制台获取用户输入，直到用户输入合法数据
 def playing(
     client_cards      : list[Card], # 用户所持卡牌信息
@@ -293,15 +329,29 @@ def playing(
 ) -> tuple[list[Card], int]:
     tcp_handler.logger.info("playing")
     tcp_handler.logger.info(f"last played: {users_played_cards[last_player] if last_player != client_player else None}")
-    
+
+    from client.interface import get_interface_type, is_simulation_mode
+
+    if is_simulation_mode():
+        new_played_cards, new_score = _get_simulated_play(
+            client_cards, last_player, client_player, users_played_cards
+        )
+        if new_played_cards == ["F"]:
+            pass  # 已是正确格式
+        else:
+            # auto_select_cards 返回 list[Card]，需保持格式一致
+            new_played_cards = list(new_played_cards)
+        tcp_handler.logger.info(f"[SIM] Now play: {new_played_cards}")
+        tcp_handler.send_playing_heartbeat(finished=True)
+        return new_played_cards, new_score
+
     global g_tcp_handler
     g_tcp_handler = tcp_handler
     reset_user_hang_out()
     prepare_input_buffer()
     global g_terminal_handler
     g_terminal_handler = PlayingTerminalHandler()
-    
-    from client.interface import get_interface_type
+
     interface_type = get_interface_type()
     tcp_handler.logger.info(f"Interface type: {interface_type}")
     if interface_type == "CLI":

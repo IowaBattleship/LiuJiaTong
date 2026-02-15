@@ -8,10 +8,68 @@ version = "1.0.0"
 description = "六家统客户端 - Flet 图形界面"
 requires-python = ">=3.10"
 dependencies = [
-    "flet>=0.25.0",
+    "flet>=0.85.0",
+    "kivy>=2.2.0",
+    # 如果使用了音频，添加：
+    # "flet_audio>=0.25.0",
 ]
 
+# Flet 应用配置（flet build 期望 app 根目录下存在 main.py）
 [tool.flet.app]
-# Flet 应用入口：符合 flet create 标准结构 (src/main.py + src/assets/)
-path = "src"
+path = "."
 module = "main"
+
+# 使用本地模板（避免 git clone 失败）
+# 需先克隆模板到 flet-build-template，然后使用 scripts/build_apk.ps1 构建
+[tool.flet.template]
+url = "flet-build-template"
+dir = ""
+
+# Android 打包配置
+[tool.flet.android]
+# 包名（必须配置）
+package_name = "com.boysboysforward.liujiatong"  # 改为你的包名
+# 应用显示名称
+display_name = "六家统"
+# 是否分架构打包（减小单个APK体积）
+split_per_abi = false  # 开发时可设为 false，发布时设为 true
+
+# 权限配置
+[tool.flet.android.permissions]
+"android.permission.INTERNET" = true
+# "android.permission.READ_EXTERNAL_STORAGE" = false  # 如需要则启用
+
+# 如果需要音频录制/播放
+# "android.permission.RECORD_AUDIO" = false
+# "android.permission.MODIFY_AUDIO_SETTINGS" = false
+
+# 签名配置（发布时需要）
+# [tool.flet.android.signing]
+# key_store = "C:/Users/你的用户名/upload-keystore.jks"
+# key_alias = "upload"
+# 密码通过环境变量设置，更安全
+
+# Hatch 构建配置（主要用于 pip install 和 wheel 包）
+[tool.hatch.build.targets.wheel]
+packages = ["core", "gui_flet", "gui_kivy", "client", "cli", "network"]
+
+# 确保资源文件包含在 wheel 包中
+[tool.hatch.build.targets.wheel.force-include]
+"core/assets" = "core/assets"
+"core/sound" = "core/sound"
+
+# 排除不需要的文件（对所有构建目标有效）
+[tool.hatch.build]
+exclude = [
+    "test",
+    "docs",
+    "gui_tkinter",
+    "server",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    "*.drawio",
+    "*.ps1",
+    "*.sh",
+    "project_structure.txt",
+]
