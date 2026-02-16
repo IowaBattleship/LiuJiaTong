@@ -1,12 +1,12 @@
-import core.logger as logger
-from cli.terminal_utils import error
+import logger
+import utils
 from game_vars import gvar
 from state_machine import GameState, GameStateMachine
 
 class Onlooker(GameStateMachine):
     # 私有方法
     def __handle_error(self, e):
-        error(f"Onlooker {self.pid}({self.state}) error: {e}")
+        utils.error(f"Onlooker {self.pid}({self.state}) error: {e}")
         self.error = True
     def __update_local_cache(self):
         with gvar.game_lock:
