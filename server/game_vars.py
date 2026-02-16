@@ -1,21 +1,23 @@
 import random
 import threading
 from state_machine import GameState
+from core.card import Card
+
 class Game_Var:
     def init_game_env(self):
         assert self.game_lock.locked()
-        self.users_cards = [[] for _ in range(6)]
-        self.users_score = [0 for _ in range(6)]
-        self.users_finished = [False for _ in range(6)] # 玩家打完所有的牌
-        self.users_played_cards = [[] for _ in range(6)]  # 场上所出手牌
+        self.users_cards       : list[list[Card]] = [[] for _ in range(6)]
+        self.users_score       : list[int]        = [0 for _ in range(6)]
+        self.users_finished    : list[bool]       = [False for _ in range(6)] # 玩家打完所有的牌
+        self.users_played_cards: list[list[Card]] = [[] for _ in range(6)]  # 场上所出手牌
 
-        self.now_score = 0  # 场上分数
-        self.now_player = 0  # 当前出牌玩家
+        self.now_score   = 0  # 场上分数
+        self.now_player  = 0  # 当前出牌玩家
         self.head_master = -1  # 头科玩家下标
         self.last_player = -1  # 上一位出牌玩家
-        self.team_score = [0, 0]  # 各队分数
-        self.team_out = [0, 0]  # 各队逃出人数
-        self.game_over = 0 # 游戏结束状态
+        self.team_score  = [0, 0]  # 各队分数
+        self.team_out    = [0, 0]  # 各队逃出人数
+        self.game_over   = 0 # 游戏结束状态
     
     def init_global_env(self, static_user_order: bool = False):
         assert self.users_info_lock.locked()
