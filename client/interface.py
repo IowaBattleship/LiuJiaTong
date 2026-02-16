@@ -6,7 +6,7 @@ from core.sound import playsound, playsounds
 from core.playingrules import judge_and_transform_cards, CardType
 from core.card import Card
 from core.FieldInfo import FieldInfo
-from gui import update_gui, init_gui, UIFramework
+from client.gui import update_gui, init_gui, UIFramework
 from cli.terminal_utils import disable_echo, enable_echo
 
 INTERFACE_TYPE = "CLI"
@@ -73,7 +73,7 @@ def main_interface(
         _ui_handler.on_field_info(field_info)
     else:
         # 回退：直接推送到 GUI（兼容 gui_flet 独立启动等场景）
-        from gui import update_gui
+        from client.gui import update_gui
         update_gui(field_info)
         try:
             import sys

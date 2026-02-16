@@ -30,7 +30,7 @@ sound.check_sound_player()
 
 from interface import set_interface_type
 import core.logger as logger
-from cli.__main__ import Client
+from client.client import Client
 from core.config import Config
 
 

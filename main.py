@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
         from cli.terminal_utils import register_signal_handler
         import core.logger as logger
-        from cli.__main__ import Client
+        from client.client import Client
         from client.interface import run_client
 
         logger.init_logger()

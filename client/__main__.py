@@ -19,7 +19,7 @@ from core import sound
 sound.check_sound_player()
 
 import core.logger as logger
-from cli.__main__ import Client
+from client.client import Client
 from core.config import Config
 from client.interface import run_client, set_simulation_mode
 

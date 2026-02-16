@@ -12,7 +12,7 @@ from core import sound
 from core.card import Card
 from core.FieldInfo import FieldInfo
 import queue
-from gui import card_queue
+from client.gui import card_queue
 
 class SpecialInput(Enum):
     left_arrow = auto(),

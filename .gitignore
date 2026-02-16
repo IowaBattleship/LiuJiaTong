@@ -9,3 +9,14 @@ client/build
 core/log/
 flet-build-template/
 0.85.0
+
+# Dart / Flutter (client_dart)
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+client_dart/build/
+client_dart/coverage/

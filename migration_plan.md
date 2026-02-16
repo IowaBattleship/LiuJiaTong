@@ -25,7 +25,7 @@ LiuJiaTong/
 ├── buildozer.spec             # Android 打包配置
 │
 ├── cli/                       # 命令行 / 客户端核心
-│   ├── __main__.py            # Client 类：游戏主循环、网络收发、状态管理
+│   ├── __main__.py            
 │   ├── card_utils.py          # 牌面转换（str↔int、分数计算等）
 │   ├── interface_cli.py       # CLI 界面回调
 │   ├── terminal_printer.py    # 终端打印
@@ -34,7 +34,8 @@ LiuJiaTong/
 ├── client/                    # 客户端抽象层
 │   ├── gui.py                 # GUI 抽象：Flet/Kivy/Tkinter 统一入口
 │   ├── interface.py           # 业务接口：等待大厅、牌局、游戏结束等
-│   └── playing_handler.py     # 出牌输入（CLI 输入 / GUI 队列 / 模拟模式）
+│   ├── playing_handler.py     # 出牌输入（CLI 输入 / GUI 队列 / 模拟模式）
+|   └── client.py
 │
 ├── core/                      # 核心领域逻辑
 │   ├── card.py                # 扑克牌模型 (Suits, Card)
@@ -348,4 +349,79 @@ lib/
 
 ---
 
-*文档版本：1.0 | 最后更新：2025-02-15*
+## 十、client_dart 逐步实现顺序（边调试边迁移）
+
+以下按「先协议、再领域、再数据层、再应用层、最后 UI」的原则，拆成可单独实现、可验证的小步，便于在 `client_dart` 目录下边做边联调。
+
+### 阶段 0：环境与协议约定（先做再写 Dart）
+
+| 步骤 | 任务 | 产出 | 如何验证 |
+|------|------|------|----------|
+| 0.1 | 在项目下创建 `client_dart` Flutter 工程（或纯 Dart 包 + 单独 Flutter app） | `client_dart/` 可运行空应用 | `flutter run` 能跑起来 |
+| 0.2 | **服务端**：在 `network/my_network.py` 增加 JSON 协议分支（如按首字节/首条消息区分 pickle vs JSON），或新文件 `my_network_json.py`，保持「4 字节长度头 + body」不变，body 改为 `json.dumps`/`json.loads`；Card 用 `to_dict`/`from_dict`（与附录九一致） | 服务端支持 JSON 连接 | 用 Python 脚本仅调用 JSON 收发与现有服务端联调通过 |
+| 0.3 | 把附录九的收发结构整理成 **协议文档**（JSON 字段名、类型、顺序、Card 格式），放在 `client_dart/docs/protocol.md` 或项目根目录 | 一份客户端/服务端共用的协议说明 | 服务端与 Dart 实现都按此文档实现 |
+
+### 阶段 1：领域层（client_dart 内，不依赖网络）
+
+| 步骤 | 任务 | 对应 Python | 如何验证 |
+|------|------|--------------|----------|
+| 1.1 | 实现 `Suits` 枚举、`Card` 类及 `fromJson`/`toJson`（与协议文档一致） | core/card.py | 单元测试：构造 Card、序列化/反序列化 JSON |
+| 1.2 | 实现 `Config`（ip, port, name, cookie）及 `fromJson`/`toJson` | core/config.py | 单元测试：与现有 LiuJiaTong.json 格式兼容 |
+| 1.3 | 实现 `FieldInfo`（或同名 DTO），字段与 client 当前使用的场面信息一致 | core/FieldInfo.py | 单元测试：从 JSON 构造、字段齐全 |
+| 1.4 | 实现 `card_utils` 能力：牌面 str↔int、分数计算、`last_played` 等 | cli/card_utils.py | 单元测试：与 Python 用例对照 |
+| 1.5 | 实现出牌规则：牌型判断、出牌合法性校验 | core/playingrules.py | 单元测试：若干牌型与非法出牌用例 |
+| 1.6 | 实现自动出牌策略（可选，可后移） | core/auto_play/strategy.py | 单元测试：给定手牌与场面，输出合法出牌 |
+
+### 阶段 2：数据层——协议与 Socket（可与服务端 JSON 联调）
+
+| 步骤 | 任务 | 对应 Python | 如何验证 |
+|------|------|--------------|----------|
+| 2.1 | 实现「4 字节长度头（大端/小端与 Python struct 一致）+ body」的读写工具函数 | network/my_network.py | 单元测试：发/收固定字节，长度与 body 正确 |
+| 2.2 | 实现协议层：将协议文档中的每种消息类型序列化为 JSON 字符串再写入 body；从 body 反序列化并解析为 Dart 对象（含 List&lt;Card&gt;） | - | 单元测试：用协议文档中的示例 JSON 往返 |
+| 2.3 | 实现 TCP Socket 连接与断开（仅连接，不跑业务） | client.client connect/close | 真机/模拟器连接当前已支持 JSON 的服务端，能 connect 且无报错 |
+| 2.4 | 实现「发送一条登录相关消息 + 接收一条响应」（例如：发送 cookie/用户名，接收 cookie 是否合法） | send_user_info / recv 首条 | 与现网服务端联调：Dart 发 JSON，服务端回 JSON，Dart 解析正确 |
+| 2.5 | 实现配置持久化：读/写与 LiuJiaTong.json 同结构的本地配置 | core/config + dump | 写入后再读出，字段一致 |
+
+### 阶段 3：应用层——主流程与状态（边接服务端边调）
+
+| 步骤 | 任务 | 对应 Python | 如何验证 |
+|------|------|--------------|----------|
+| 3.1 | 实现完整「登录流程」：发 cookie/用户名、收 cookie 合法性、收新 cookie（若非法）、收恢复结果（若合法） | send_user_info + recv 多条 | 与现网服务端联调：新用户、带 cookie 恢复两种都走通 |
+| 3.2 | 实现「等待大厅」：循环接收 users_name、users_error，直到 6 人满员 | recv_waiting_hall_info | 联调：大厅满员后能正确得到 6 个用户名 |
+| 3.3 | 实现「场上信息」：收 is_player、users_name、client_player | recv_field_info | 联调：开局后 Dart 端 is_player/client_player 正确 |
+| 3.4 | 实现「单轮牌局」：收 round_info（game_over、分数、牌数、出牌、手牌、now_score、now_player、head_master 等），解析为 FieldInfo/内部状态 | recv_round_info | 联调：收一轮数据，Dart 内状态与 Python 客户端一致 |
+| 3.5 | 实现「出牌上报」：发 client_cards、users_played_cards[client_player]、now_score；以及「出牌心跳」：发 finished | send_player_info、send_playing_heartbeat | 联调：轮到 Dart 客户端出牌时，服务端能正确收到并推进对局 |
+| 3.6 | 将上述步骤串成**主循环**：登录 → 大厅 → 场上信息 → 循环(收 round_info → 更新状态 → 若 game_over 退出 → 若轮到自己则收输入/自动出牌并发送) | client.run() | 与现网服务端完整打一局（可先用自动出牌或简单固定出牌） |
+| 3.7 | 可选：心跳、断线重连、错误弹窗/日志 | - | 手动断网或停服务端，观察行为 |
+
+### 阶段 4：表现层（Flutter UI）
+
+| 步骤 | 任务 | 对应 Python | 如何验证 |
+|------|------|--------------|----------|
+| 4.1 | 登录/配置页：输入 IP、端口、用户名，保存到本地配置并触发连接 | gui_flet 登录 | 填完点连接能进主流程 |
+| 4.2 | 等待大厅页：展示当前用户列表与错误信息，满 6 人后自动进入 | waiting_hall_interface | 大厅人数与名字正确 |
+| 4.3 | 牌局主界面：手牌、各家出牌区、分数、当前出牌人、头科等（只读） | main_interface 展示部分 | 与 Python 客户端同局对比显示一致 |
+| 4.4 | 出牌交互：选牌、确认/跳过、自动出牌开关，并调用应用层发送 | playing_handler + gui | 轮到自己时能选牌并成功发送 |
+| 4.5 | 游戏结束页：展示结果（含「寻找战犯」等） | game_over_interface | 结束后显示正确 |
+| 4.6 | 音效：出牌、得分等（用 audioplayers 等） | core/sound | 对应时机有声音 |
+
+### 阶段 5：资源与多平台构建
+
+| 步骤 | 任务 | 如何验证 |
+|------|------|----------|
+| 5.1 | 迁移牌面图、背景、字体、音效到 Flutter assets | 各平台能加载资源 |
+| 5.2 | 配置 Android / iOS / Web / Desktop 构建与图标、启动图 | 各平台能打包并运行 |
+
+### 建议的「边调试边迁移」节奏
+
+1. **先完成 0.2 + 0.3**：服务端 JSON 与协议文档就绪后，Dart 侧始终按同一份协议实现，避免反复改。
+2. **阶段 1 全部用单元测试验证**：不依赖服务端，方便随时跑。
+3. **阶段 2 的 2.3～2.4 是第一次真联调**：建议用「仅登录」的 Dart 客户端对当前服务端，确认 4 字节头 + JSON body 无误。
+4. **阶段 3 每完成 3.1～3.6 中的一步就联调一步**：例如先只做登录+大厅，再加场上信息，再加一轮 round，再加出牌，最后串成主循环。
+5. **UI（阶段 4）在 3.6 主循环可用后再做**：可先用控制台/简单页面打印状态，主循环稳定后再替换为完整 Flutter 界面。
+
+按上述顺序实现，可以做到：**协议可测、领域可测、网络与流程每步都可与现网服务端联调**，最终在 client_dart 中达到与当前 Python client 对等的跨平台客户端能力。
+
+---
+
+*文档版本：1.1 | 最后更新：2025-02-15*
