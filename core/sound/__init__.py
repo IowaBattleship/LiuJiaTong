@@ -4,41 +4,69 @@ import platform
 import subprocess
 from cli.terminal_utils import fatal
 
+
 def check_sound_player():
+    """
+    检查当前平台是否具备播放音效的能力。
+    - macOS: 需要 afplay
+    - Linux: 需要 aplay
+    - Windows: 使用标准库 winsound，无需额外依赖
+    """
+
     def __checker(cmd: list[str], obj: str):
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
-        except:
+        except Exception:
             fatal(f'This game needs "{obj}" to play sound, please install it')
-    
-    if platform.system() == "Darwin":
+
+    system = platform.system()
+    if system == "Darwin":
         __checker(["afplay"], "afplay")
-    elif platform.system() == "Linux":
+    elif system == "Linux":
         __checker(["aplay"], "aplay")
-    elif platform.system() == "Windows":
-        __checker(["powershell", "-c", "New-Object", "Media.SoundPlayer"], "Media.SoundPlayer")
+    elif system == "Windows":
+        # winsound 是标准库，不额外检查外部程序，若导入失败则直接报错
+        try:
+            import winsound  # noqa: F401
+        except Exception:
+            fatal('This game needs "winsound" (Python standard lib) to play sound on Windows.')
     else:
-        raise RuntimeError('Unknown os') 
+        raise RuntimeError("Unknown os")
+
 
 def __playsound(paths: list[str], playtime):
-    '''
+    """
     播放音频
-    :param paths: 需要播放的音频文件
+    :param paths: 需要播放的音频文件（绝对路径）
     :param playtime: 该参数无效
-    '''
+    """
+    system = platform.system()
+
+    # Windows: 使用 winsound，避免频繁启动 powershell 进程导致内存/句柄占用
+    if system == "Windows":
+        import winsound
+
+        for path in paths:
+            assert os.path.isabs(path), path
+            try:
+                winsound.PlaySound(path, winsound.SND_FILENAME)
+            except Exception:
+                # 播放失败时忽略，避免影响游戏逻辑
+                continue
+        return
+
+    # 其他平台仍然通过外部播放器播放
     for path in paths:
         assert os.path.isabs(path), path
-        cmd = ""
-        if platform.system() == "Darwin":
-            cmd = f"afplay {path}"
-        elif platform.system() == "Linux":
-            cmd = f"aplay -q {path}"
-        elif platform.system() == "Windows":
-            cmd = f"powershell -c (New-Object Media.SoundPlayer '{path}').PlaySync()"
+        if system == "Darwin":
+            cmd = ["afplay", path]
+        elif system == "Linux":
+            cmd = ["aplay", "-q", path]
         else:
-            raise RuntimeError('Unknown os') 
+            raise RuntimeError("Unknown os")
+
         subprocess.Popen(
-            cmd.split(),
+            cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         ).wait()

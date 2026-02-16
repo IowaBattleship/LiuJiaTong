@@ -101,6 +101,9 @@ def _play_sound(
     his_now_score: int,
     users_played_cards: list,
 ):
+    # 在模拟模式下默认不播放任何音效，避免占用系统资源
+    if is_simulation_mode():
+        return
     if not is_start:
         playsounds(["start", "open"], True)
     elif last_player == now_player and his_now_score > 0:
@@ -145,7 +148,9 @@ def game_over_interface(client_player: int, if_game_over: int) -> None:
             print("游戏结束，你的队伍未能取得胜利", end="")
             if if_game_over < 0:
                 print("，并被对方双统")
-        playsound("clap", False, None)
+        # 模拟模式下默认不播放游戏结束音效
+        if not is_simulation_mode():
+            playsound("clap", False, None)
 
 
 def run_client(client, mode: str) -> None:
