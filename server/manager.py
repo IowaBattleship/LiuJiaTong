@@ -1,27 +1,22 @@
 import random
-import utils
+import copy
 import threading
-import logger
-from game_vars import gvar
-from state_machine import GameState, GameStateMachine
+import core.logger as logger
+
+from core import card
+from server.game_vars import gvar
+from server.state_machine import GameState, GameStateMachine
+
 
 # 初始化牌
 def init_cards():
     assert gvar.game_lock.locked()
-    all_cards = []
-    # 3~10,J,Q,K,A,2
-    for i in range(3, 16):
-        for _ in range(16):
-            all_cards.append(i)
-    # Jockers
-    for i in range(16, 18):
-        for _ in range(4):
-            all_cards.append(i)
+    all_cards = card.generate_cards()
     random.shuffle(all_cards)
 
     for i in range(0, 6):
-        user_cards = sorted([all_cards[j] for j in range(i, len(all_cards), 6)])
-        gvar.users_cards[i] = [utils.int_to_str(x) for x in user_cards]
+        user_cards = sorted([all_cards[j] for j in range(i, len(all_cards), 6)]) # 模拟发牌
+        gvar.users_cards[i] = copy.deepcopy(user_cards) # 11/03/2024: 支持花色，现在以list[Card]类型保存
 
 '''
 判断游戏是否结束
@@ -124,6 +119,7 @@ class Manager(GameStateMachine):
         with gvar.game_lock:
             gvar.init_game_env()
             init_cards()  # 初始化牌并发牌
+
     def game_over(self): 
         with gvar.users_info_lock:
             gvar.init_global_env(self.static_user_order)

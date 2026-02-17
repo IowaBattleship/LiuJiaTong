@@ -1,28 +1,31 @@
 import time
-import utils
-import logger
-from game_vars import gvar
-from state_machine import GameState, GameStateMachine
+import core.logger as logger
+from common.console import error, warn, success
+from common.card_io import cards_to_strs
+from server.game_vars import gvar
+from server.state_machine import GameState, GameStateMachine
 
 class Player(GameStateMachine):
     # 私有方法
     def __handle_error(self, e):
-        utils.error(f"Player {self.pid}({self.client_player}, {self.state}) error: {e}")
+        error(f"Player {self.pid}({self.client_player}, {self.state}) error: {e}")
         self.error = True
+    
     def __update_local_cache(self):
         with gvar.game_lock:
             self.__game_over = gvar.game_over
             self.__now_player = gvar.now_player
     # 抽象类方法
+    
     def game_start(self): 
         raise RuntimeError("Unsupport state")
     def game_over(self): 
         if self.error:
             with gvar.users_info_lock:
                 gvar.users_error[self.client_player] = True
-            utils.warn(f"Player {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}")
+            warn(f"Player {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}")
         else:
-            utils.success(f"Player {self.pid}({self.client_player}) exit successfully")
+            success(f"Player {self.pid}({self.client_player}) exit successfully")
         self.tcp_handler.close()
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
@@ -59,37 +62,64 @@ class Player(GameStateMachine):
                 self.tcp_handler.send_round_info()
         except Exception as e:
             self.__handle_error(e)
+    
     def recv_player_info(self): 
+        """
+        接收玩家信息，并更新游戏状态
+
+        该函数负责接收客户端发送的玩家信息，包括玩家手牌、已出牌和当前得分。
+        同时，它还会更新游戏状态，包括玩家手牌、已出牌和当前得分。
+        """
+        print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}")
         assert self.error is False
         try:
             with gvar.users_info_lock:
                 print(f"Now round:{self.client_player} -> {gvar.users_info[self.client_player]}")
-            # 等客户端的heartbeat返回值为真，意味着出了有效牌
-            while self.tcp_handler.recv_playing_heartbeat() is False:
+
+            # 等待客户端的heartbeat返回值为真，意味着出了有效牌
+            while not self.tcp_handler.recv_playing_heartbeat():
                 pass
-            user_cards, user_played_cards, now_score = \
-                self.tcp_handler.recv_player_reply()
+
+            # 接收客户端发送的玩家信息
+            user_cards, user_played_cards, now_score = self.tcp_handler.recv_player_reply()
+            print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received cards:{cards_to_strs(user_cards)}")
+            if user_played_cards == ['F']:
+                print(f'Player {self.pid}({self.client_player}) played cards: {user_played_cards}')
+            else:
+                print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received played cards:{cards_to_strs(user_played_cards)}")
+            print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received score:{now_score}")
+            
+            # 更新游戏状态
             with gvar.game_lock:
                 assert gvar.users_played_cards[self.client_player] == [], \
                     gvar.users_played_cards[self.client_player]
-                gvar.users_cards[self.client_player] = user_cards
-                gvar.users_played_cards[self.client_player] = user_played_cards
-                gvar.now_score = now_score
-                print(f'Player {self.pid}({self.client_player}) played cards:{gvar.users_played_cards[self.client_player]}')
+                gvar.users_cards[self.client_player]        = user_cards        # 更新玩家手牌
+                gvar.users_played_cards[self.client_player] = user_played_cards # 更新玩家已出牌
+                gvar.now_score                              = now_score         # 更新当前得分
+                if gvar.users_played_cards[self.client_player] == ['F']:
+                    print(f'Player {self.pid}({self.client_player}) played cards: {gvar.users_played_cards[self.client_player]}')
+                else:
+                    print(f'Player {self.pid}({self.client_player}) played cards:{cards_to_strs(gvar.users_played_cards[self.client_player])}')
         except Exception as e:
             self.__handle_error(e)
+    
     def init_sync(self): 
         gvar.game_init_barrier.wait()
+    
     def onlooker_sync(self): 
         raise RuntimeError("Unsupport state")
+    
     def game_start_sync(self): 
         gvar.game_start_barrier.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
         self.__update_local_cache()
+    
     def send_round_info_sync(self): 
         gvar.send_round_info_barrier.wait()
+    
     def recv_player_info_sync(self): 
         gvar.recv_player_info_barrier.wait()
+    
     def next_turn_sync(self): 
         gvar.next_turn_barrier.wait()
         # 这里放松了条件，因为在下一个同步点之前数据是只读的
@@ -112,6 +142,7 @@ class Player(GameStateMachine):
             if self.state == self.his_state:
                 self.his_state = None
             nonlocal recovery; recovery = True
+
         # 状态转移
         if self.state == GameState.init:
             if self.his_state is None:
