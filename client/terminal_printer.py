@@ -2,6 +2,14 @@ from typing import List
 import sys
 import os
 import platform
+import shutil
+
+def _get_terminal_columns() -> int:
+    """获取终端列数；无 TTY（如子进程）时返回默认值 80。"""
+    try:
+        return shutil.get_terminal_size(fallback=(80, 24)).columns
+    except (OSError, ValueError):
+        return 80
 
 def columns(string: str) -> int:
     columns = 0
@@ -14,8 +22,8 @@ def columns(string: str) -> int:
 
 class TerminalHandler:
     def __init__(self):
-        # 终端信息
-        self.max_column = os.get_terminal_size().columns - 1
+        # 终端信息；无 TTY 时使用 _get_terminal_columns 的默认值
+        self.max_column = _get_terminal_columns() - 1
         assert self.max_column >= 4, self.max_column
         self.row = self.column = 0
         self.row_buffer = ""
@@ -26,7 +34,7 @@ class TerminalHandler:
         self.strikethrough = False
     
     def update_max_column(self, max_column: int):
-        self.max_column = os.get_terminal_size().columns - 1
+        self.max_column = _get_terminal_columns() - 1
         self.max_column = min(self.max_column, max_column)
         assert self.max_column >= 4, self.max_column
     

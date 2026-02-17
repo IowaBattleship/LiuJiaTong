@@ -1,13 +1,14 @@
 import time
-import utils
-import logger
-from game_vars import gvar
-from state_machine import GameState, GameStateMachine
+import core.logger as logger
+from common.console import error, warn, success
+from common.card_io import cards_to_strs
+from server.game_vars import gvar
+from server.state_machine import GameState, GameStateMachine
 
 class Player(GameStateMachine):
     # 私有方法
     def __handle_error(self, e):
-        utils.error(f"Player {self.pid}({self.client_player}, {self.state}) error: {e}")
+        error(f"Player {self.pid}({self.client_player}, {self.state}) error: {e}")
         self.error = True
     
     def __update_local_cache(self):
@@ -22,9 +23,9 @@ class Player(GameStateMachine):
         if self.error:
             with gvar.users_info_lock:
                 gvar.users_error[self.client_player] = True
-            utils.warn(f"Player {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}")
+            warn(f"Player {self.pid}({self.client_player}) error exit -> cookie: {self.tcp_handler.user_cookie}")
         else:
-            utils.success(f"Player {self.pid}({self.client_player}) exit successfully")
+            success(f"Player {self.pid}({self.client_player}) exit successfully")
         self.tcp_handler.close()
     def onlooker_register(self): 
         raise RuntimeError("Unsupport state")
@@ -81,11 +82,11 @@ class Player(GameStateMachine):
 
             # 接收客户端发送的玩家信息
             user_cards, user_played_cards, now_score = self.tcp_handler.recv_player_reply()
-            print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received cards:{utils.cards_to_strs(user_cards)}")
+            print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received cards:{cards_to_strs(user_cards)}")
             if user_played_cards == ['F']:
                 print(f'Player {self.pid}({self.client_player}) played cards: {user_played_cards}')
             else:
-                print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received played cards:{utils.cards_to_strs(user_played_cards)}")
+                print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received played cards:{cards_to_strs(user_played_cards)}")
             print(f"recv_player_info. ID:{self.client_player}, PID:{self.pid}. Received score:{now_score}")
             
             # 更新游戏状态
@@ -98,7 +99,7 @@ class Player(GameStateMachine):
                 if gvar.users_played_cards[self.client_player] == ['F']:
                     print(f'Player {self.pid}({self.client_player}) played cards: {gvar.users_played_cards[self.client_player]}')
                 else:
-                    print(f'Player {self.pid}({self.client_player}) played cards:{utils.cards_to_strs(gvar.users_played_cards[self.client_player])}')
+                    print(f'Player {self.pid}({self.client_player}) played cards:{cards_to_strs(gvar.users_played_cards[self.client_player])}')
         except Exception as e:
             self.__handle_error(e)
     

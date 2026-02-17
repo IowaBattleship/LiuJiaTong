@@ -1,11 +1,11 @@
 import random
 import copy
 import threading
-import logger
+import core.logger as logger
 
-import card as card
-from game_vars import gvar
-from state_machine import GameState, GameStateMachine
+from core import card
+from server.game_vars import gvar
+from server.state_machine import GameState, GameStateMachine
 
 
 # 初始化牌

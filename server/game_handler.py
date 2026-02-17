@@ -1,13 +1,13 @@
 import secrets
 import string
-import logger
-import utils
-from player import Player
-from onlooker import Onlooker
-from game_vars import gvar
+import core.logger as logger
+from common.console import success, error
+from server.player import Player
+from server.onlooker import Onlooker
+from server.game_vars import gvar
 from socketserver import BaseRequestHandler
-from my_network import recv_data_from_socket, send_data_to_socket
-from card import Card
+from core.network.my_network import recv_data_from_socket, send_data_to_socket
+from core.card import Card
 
 class Game_Handler(BaseRequestHandler):
     def __init__(self, request, client_address, server):
@@ -106,7 +106,7 @@ class Game_Handler(BaseRequestHandler):
                     self.is_player = False
                     self.client_player = secrets.randbelow(6)
                     send_data_to_socket(None, self.request)
-                    utils.success(f"Onlooker {user_name}({self.pid}) joined game -> player: {self.client_player}")
+                    success(f"Onlooker {user_name}({self.pid}) joined game -> player: {self.client_player}")
                 else:
                     self.is_player = True
                     self.client_player = gvar.users_player_id[user_idx]
@@ -115,7 +115,7 @@ class Game_Handler(BaseRequestHandler):
                     while gvar.users_cookie.get(self.user_cookie) is not None:
                         self.user_cookie = self.generate_cookie()
                     send_data_to_socket(self.user_cookie, self.request)
-                    utils.success(f"Player {user_name}({self.client_player}, {self.pid}) joined game -> cookie: {self.user_cookie}")
+                    success(f"Player {user_name}({self.client_player}, {self.pid}) joined game -> cookie: {self.user_cookie}")
                     logger.info(f"{user_name}({self.client_player}, {self.pid}) -> user_cookie: {self.user_cookie}")
                 # 修改是放在最后的，防止中间出现任何的网络通信失败
                 if self.is_player:
@@ -135,12 +135,12 @@ class Game_Handler(BaseRequestHandler):
                     gvar.users_error[self.client_player] = False
                     user_name, old_pid = gvar.users_info[self.client_player]
                     gvar.users_info[self.client_player] = (user_name, self.pid)
-                    utils.success(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
+                    success(f"{self.pid} recover: {(user_name, old_pid)} -> {(user_name, self.pid)}")
                 else:
                     send_data_to_socket(False, self.request)
                     raise RuntimeError("Recover failed because user is playing")
         except Exception as e:
-            utils.error(f"{self.pid} error receiving user info: {e}") # 11/03/2024: Fix typo
+            error(f"{self.pid} error receiving user info: {e}") # 11/03/2024: Fix typo
             return False
         else:
             return True

@@ -1,7 +1,7 @@
 import random
 import threading
-from state_machine import GameState
-from card import Card
+from server.state_machine import GameState
+from core.card import Card
 
 class Game_Var:
     def init_game_env(self):

@@ -1,0 +1,503 @@
+[SEED] 3
+[INIT] dealt cards
+[ROUND] #1, now_player=Player0
+[TURN] Player0 PLAY ['Suits.club_3'], gained_score=0, now_score=0, remain=35
+[ROUND] #2, now_player=Player1
+[TURN] Player1 PLAY ['Suits.club_4'], gained_score=0, now_score=0, remain=35
+[ROUND] #3, now_player=Player2
+[TURN] Player2 PLAY ['Suits.club_5'], gained_score=5, now_score=5, remain=35
+[ROUND] #4, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_6'], gained_score=0, now_score=5, remain=35
+[ROUND] #5, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_7'], gained_score=0, now_score=5, remain=35
+[ROUND] #6, now_player=Player5
+[TURN] Player5 PLAY ['Suits.heart_8'], gained_score=0, now_score=5, remain=35
+[ROUND] #7, now_player=Player0
+[TURN] Player0 PLAY ['Suits.spade_9'], gained_score=0, now_score=5, remain=34
+[ROUND] #8, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_B'], gained_score=10, now_score=15, remain=34
+[ROUND] #9, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_J'], gained_score=0, now_score=15, remain=34
+[ROUND] #10, now_player=Player3
+[TURN] Player3 PLAY ['Suits.club_Q'], gained_score=0, now_score=15, remain=34
+[ROUND] #11, now_player=Player4
+[TURN] Player4 PLAY ['Suits.heart_K'], gained_score=10, now_score=25, remain=34
+[ROUND] #12, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_A'], gained_score=0, now_score=25, remain=34
+[ROUND] #13, now_player=Player0
+[TURN] Player0 PLAY ['Suits.club_2'], gained_score=0, now_score=25, remain=33
+[ROUND] #14, now_player=Player1
+[TURN] Player1 PLAY ['Suits.empty_0'], gained_score=0, now_score=25, remain=33
+[ROUND] #15, now_player=Player2
+[TURN] Player2 PLAY ['Suits.empty_1'], gained_score=0, now_score=25, remain=33
+[ROUND] #16, now_player=Player3
+[TURN] Player3 PLAY ['Suits.club_4', 'Suits.diamond_4', 'Suits.spade_4', 'Suits.heart_4'], gained_score=0, now_score=25, remain=30
+[ROUND] #17, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_5', 'Suits.heart_5', 'Suits.heart_5', 'Suits.heart_5'], gained_score=20, now_score=45, remain=30
+[ROUND] #18, now_player=Player5
+[TURN] Player5 PLAY ['Suits.diamond_Q', 'Suits.spade_Q', 'Suits.club_Q', 'Suits.club_Q'], gained_score=0, now_score=45, remain=30
+[ROUND] #19, now_player=Player0
+[TURN] Player0 PLAY ['Suits.club_A', 'Suits.spade_A', 'Suits.heart_A', 'Suits.club_A'], gained_score=0, now_score=45, remain=29
+[ROUND] #20, now_player=Player1
+[TURN] Player1 PLAY ['Suits.spade_2', 'Suits.diamond_2', 'Suits.club_2', 'Suits.heart_2'], gained_score=0, now_score=45, remain=29
+[ROUND] #21, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #22, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #23, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #24, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #25, now_player=Player0
+[TURN] Player0 PASS
+[TRICK] winner=Player1, trick_score=45, total_score=45
+[ROUND] #26, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_3'], gained_score=0, now_score=0, remain=28
+[ROUND] #27, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_4'], gained_score=0, now_score=0, remain=32
+[ROUND] #28, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_5'], gained_score=5, now_score=5, remain=29
+[ROUND] #29, now_player=Player4
+[TURN] Player4 PLAY ['Suits.heart_6'], gained_score=0, now_score=5, remain=29
+[ROUND] #30, now_player=Player5
+[TURN] Player5 PLAY ['Suits.diamond_7'], gained_score=0, now_score=5, remain=29
+[ROUND] #31, now_player=Player0
+[TURN] Player0 PLAY ['Suits.diamond_8'], gained_score=0, now_score=5, remain=28
+[ROUND] #32, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_9'], gained_score=0, now_score=5, remain=27
+[ROUND] #33, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_B'], gained_score=10, now_score=15, remain=31
+[ROUND] #34, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_J'], gained_score=0, now_score=15, remain=28
+[ROUND] #35, now_player=Player4
+[TURN] Player4 PLAY ['Suits.spade_Q'], gained_score=0, now_score=15, remain=28
+[ROUND] #36, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_K'], gained_score=10, now_score=25, remain=28
+[ROUND] #37, now_player=Player0
+[TURN] Player0 PLAY ['Suits.spade_2'], gained_score=0, now_score=25, remain=27
+[ROUND] #38, now_player=Player1
+[TURN] Player1 PLAY ['Suits.empty_0'], gained_score=0, now_score=25, remain=26
+[ROUND] #39, now_player=Player2
+[TURN] Player2 PLAY ['Suits.spade_7', 'Suits.diamond_7', 'Suits.heart_7', 'Suits.club_7'], gained_score=0, now_score=25, remain=27
+[ROUND] #40, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_B', 'Suits.club_B', 'Suits.spade_B', 'Suits.diamond_B'], gained_score=40, now_score=65, remain=24
+[ROUND] #41, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #42, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #43, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #44, now_player=Player1
+[TURN] Player1 PLAY ['Suits.club_J', 'Suits.diamond_J', 'Suits.club_J', 'Suits.club_J'], gained_score=0, now_score=65, remain=22
+[ROUND] #45, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_Q', 'Suits.diamond_Q', 'Suits.heart_Q', 'Suits.heart_Q'], gained_score=0, now_score=65, remain=23
+[ROUND] #46, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_2', 'Suits.club_2', 'Suits.spade_2', 'Suits.heart_2'], gained_score=0, now_score=65, remain=20
+[ROUND] #47, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #48, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #49, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #50, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #51, now_player=Player2
+[TURN] Player2 PASS
+[TRICK] winner=Player3, trick_score=65, total_score=65
+[ROUND] #52, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_3'], gained_score=0, now_score=0, remain=19
+[ROUND] #53, now_player=Player4
+[TURN] Player4 PLAY ['Suits.spade_4'], gained_score=0, now_score=0, remain=27
+[ROUND] #54, now_player=Player5
+[TURN] Player5 PLAY ['Suits.spade_5'], gained_score=5, now_score=5, remain=27
+[ROUND] #55, now_player=Player0
+[TURN] Player0 PLAY ['Suits.spade_6'], gained_score=0, now_score=5, remain=26
+[ROUND] #56, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_7'], gained_score=0, now_score=5, remain=21
+[ROUND] #57, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_8'], gained_score=0, now_score=5, remain=22
+[ROUND] #58, now_player=Player3
+[TURN] Player3 PLAY ['Suits.club_9'], gained_score=0, now_score=5, remain=18
+[ROUND] #59, now_player=Player4
+[TURN] Player4 PLAY ['Suits.heart_B'], gained_score=10, now_score=15, remain=26
+[ROUND] #60, now_player=Player5
+[TURN] Player5 PLAY ['Suits.spade_J'], gained_score=0, now_score=15, remain=26
+[ROUND] #61, now_player=Player0
+[TURN] Player0 PLAY ['Suits.heart_Q'], gained_score=0, now_score=15, remain=25
+[ROUND] #62, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_K'], gained_score=10, now_score=25, remain=20
+[ROUND] #63, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_A'], gained_score=0, now_score=25, remain=21
+[ROUND] #64, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_2'], gained_score=0, now_score=25, remain=17
+[ROUND] #65, now_player=Player4
+[TURN] Player4 PLAY ['Suits.empty_0'], gained_score=0, now_score=25, remain=25
+[ROUND] #66, now_player=Player5
+[TURN] Player5 PLAY ['Suits.empty_1'], gained_score=0, now_score=25, remain=25
+[ROUND] #67, now_player=Player0
+[TURN] Player0 PLAY ['Suits.diamond_5', 'Suits.spade_5', 'Suits.diamond_5', 'Suits.spade_5'], gained_score=20, now_score=45, remain=21
+[ROUND] #68, now_player=Player1
+[TURN] Player1 PLAY ['Suits.club_8', 'Suits.spade_8', 'Suits.spade_8', 'Suits.club_8'], gained_score=0, now_score=45, remain=16
+[ROUND] #69, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #70, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #71, now_player=Player4
+[TURN] Player4 PLAY ['Suits.diamond_9', 'Suits.heart_9', 'Suits.heart_9', 'Suits.club_9'], gained_score=0, now_score=45, remain=21
+[ROUND] #72, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #73, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #74, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #75, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #76, now_player=Player3
+[TURN] Player3 PASS
+[TRICK] winner=Player4, trick_score=45, total_score=45
+[ROUND] #77, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_3'], gained_score=0, now_score=0, remain=20
+[ROUND] #78, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_4'], gained_score=0, now_score=0, remain=24
+[ROUND] #79, now_player=Player0
+[TURN] Player0 PLAY ['Suits.spade_5'], gained_score=5, now_score=5, remain=20
+[ROUND] #80, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_7'], gained_score=0, now_score=5, remain=15
+[ROUND] #81, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_8'], gained_score=0, now_score=5, remain=20
+[ROUND] #82, now_player=Player3
+[TURN] Player3 PLAY ['Suits.club_9'], gained_score=0, now_score=5, remain=16
+[ROUND] #83, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_B'], gained_score=10, now_score=15, remain=19
+[ROUND] #84, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_J'], gained_score=0, now_score=15, remain=23
+[ROUND] #85, now_player=Player0
+[TURN] Player0 PLAY ['Suits.diamond_Q'], gained_score=0, now_score=15, remain=19
+[ROUND] #86, now_player=Player1
+[TURN] Player1 PLAY ['Suits.spade_K'], gained_score=10, now_score=25, remain=14
+[ROUND] #87, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_2'], gained_score=0, now_score=25, remain=19
+[ROUND] #88, now_player=Player3
+[TURN] Player3 PLAY ['Suits.empty_0'], gained_score=0, now_score=25, remain=15
+[ROUND] #89, now_player=Player4
+[TURN] Player4 PLAY ['Suits.empty_1'], gained_score=0, now_score=25, remain=18
+[ROUND] #90, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_3', 'Suits.diamond_3', 'Suits.spade_3', 'Suits.diamond_3'], gained_score=0, now_score=25, remain=19
+[ROUND] #91, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #92, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #93, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #94, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #95, now_player=Player4
+[TURN] Player4 PLAY ['Suits.spade_6', 'Suits.club_6', 'Suits.diamond_6', 'Suits.spade_6'], gained_score=0, now_score=25, remain=14
+[ROUND] #96, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #97, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #98, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #99, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #100, now_player=Player3
+[TURN] Player3 PASS
+[TRICK] winner=Player4, trick_score=25, total_score=70
+[ROUND] #101, now_player=Player4
+[TURN] Player4 PLAY ['Suits.spade_3'], gained_score=0, now_score=0, remain=13
+[ROUND] #102, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_4'], gained_score=0, now_score=0, remain=18
+[ROUND] #103, now_player=Player0
+[TURN] Player0 PLAY ['Suits.club_5'], gained_score=5, now_score=5, remain=18
+[ROUND] #104, now_player=Player1
+[TURN] Player1 PLAY ['Suits.club_7'], gained_score=0, now_score=5, remain=13
+[ROUND] #105, now_player=Player2
+[TURN] Player2 PLAY ['Suits.club_8'], gained_score=0, now_score=5, remain=18
+[ROUND] #106, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_J'], gained_score=0, now_score=5, remain=14
+[ROUND] #107, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_Q'], gained_score=0, now_score=5, remain=12
+[ROUND] #108, now_player=Player5
+[TURN] Player5 PLAY ['Suits.diamond_K'], gained_score=10, now_score=15, remain=17
+[ROUND] #109, now_player=Player0
+[TURN] Player0 PLAY ['Suits.empty_1'], gained_score=0, now_score=15, remain=17
+[ROUND] #110, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #111, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #112, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #113, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #114, now_player=Player5
+[TURN] Player5 PASS
+[TRICK] winner=Player0, trick_score=15, total_score=15
+[ROUND] #115, now_player=Player0
+[TURN] Player0 PLAY ['Suits.club_3'], gained_score=0, now_score=0, remain=16
+[ROUND] #116, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_5'], gained_score=5, now_score=5, remain=12
+[ROUND] #117, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_6'], gained_score=0, now_score=5, remain=17
+[ROUND] #118, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_7'], gained_score=0, now_score=5, remain=13
+[ROUND] #119, now_player=Player4
+[TURN] Player4 PLAY ['Suits.spade_8'], gained_score=0, now_score=5, remain=11
+[ROUND] #120, now_player=Player5
+[TURN] Player5 PLAY ['Suits.spade_9'], gained_score=0, now_score=5, remain=16
+[ROUND] #121, now_player=Player0
+[TURN] Player0 PLAY ['Suits.diamond_B'], gained_score=10, now_score=15, remain=15
+[ROUND] #122, now_player=Player1
+[TURN] Player1 PLAY ['Suits.spade_Q'], gained_score=0, now_score=15, remain=11
+[ROUND] #123, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_K'], gained_score=10, now_score=25, remain=16
+[ROUND] #124, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_A'], gained_score=0, now_score=25, remain=12
+[ROUND] #125, now_player=Player4
+[TURN] Player4 PLAY ['Suits.heart_2'], gained_score=0, now_score=25, remain=10
+[ROUND] #126, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #127, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #128, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #129, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #130, now_player=Player3
+[TURN] Player3 PASS
+[TRICK] winner=Player4, trick_score=25, total_score=95
+[ROUND] #131, now_player=Player4
+[TURN] Player4 PLAY ['Suits.diamond_4'], gained_score=0, now_score=0, remain=9
+[ROUND] #132, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_6'], gained_score=0, now_score=0, remain=15
+[ROUND] #133, now_player=Player0
+[TURN] Player0 PLAY ['Suits.club_7'], gained_score=0, now_score=0, remain=14
+[ROUND] #134, now_player=Player1
+[TURN] Player1 PLAY ['Suits.spade_8'], gained_score=0, now_score=0, remain=10
+[ROUND] #135, now_player=Player2
+[TURN] Player2 PLAY ['Suits.diamond_9'], gained_score=0, now_score=0, remain=15
+[ROUND] #136, now_player=Player3
+[TURN] Player3 PLAY ['Suits.heart_J'], gained_score=0, now_score=0, remain=11
+[ROUND] #137, now_player=Player4
+[TURN] Player4 PLAY ['Suits.diamond_K'], gained_score=10, now_score=10, remain=8
+[ROUND] #138, now_player=Player5
+[TURN] Player5 PLAY ['Suits.spade_A'], gained_score=0, now_score=10, remain=14
+[ROUND] #139, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #140, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #141, now_player=Player2
+[TURN] Player2 PLAY ['Suits.club_2'], gained_score=0, now_score=10, remain=14
+[ROUND] #142, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #143, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #144, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #145, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #146, now_player=Player1
+[TURN] Player1 PASS
+[TRICK] winner=Player2, trick_score=10, total_score=10
+[ROUND] #147, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_3'], gained_score=0, now_score=0, remain=13
+[ROUND] #148, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_4'], gained_score=0, now_score=0, remain=10
+[ROUND] #149, now_player=Player4
+[TURN] Player4 PLAY ['Suits.heart_5'], gained_score=5, now_score=5, remain=7
+[ROUND] #150, now_player=Player5
+[TURN] Player5 PLAY ['Suits.spade_6'], gained_score=0, now_score=5, remain=13
+[ROUND] #151, now_player=Player0
+[TURN] Player0 PLAY ['Suits.heart_7'], gained_score=0, now_score=5, remain=13
+[ROUND] #152, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_8'], gained_score=0, now_score=5, remain=9
+[ROUND] #153, now_player=Player2
+[TURN] Player2 PLAY ['Suits.spade_J'], gained_score=0, now_score=5, remain=12
+[ROUND] #154, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_Q'], gained_score=0, now_score=5, remain=9
+[ROUND] #155, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_A'], gained_score=0, now_score=5, remain=6
+[ROUND] #156, now_player=Player5
+[TURN] Player5 PLAY ['Suits.diamond_2'], gained_score=0, now_score=5, remain=12
+[ROUND] #157, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #158, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #159, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #160, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #161, now_player=Player4
+[TURN] Player4 PASS
+[TRICK] winner=Player5, trick_score=5, total_score=5
+[ROUND] #162, now_player=Player5
+[TURN] Player5 PLAY ['Suits.heart_3'], gained_score=0, now_score=0, remain=11
+[ROUND] #163, now_player=Player0
+[TURN] Player0 PLAY ['Suits.diamond_4'], gained_score=0, now_score=0, remain=12
+[ROUND] #164, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_9'], gained_score=0, now_score=0, remain=8
+[ROUND] #165, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_J'], gained_score=0, now_score=0, remain=11
+[ROUND] #166, now_player=Player3
+[TURN] Player3 PLAY ['Suits.diamond_K'], gained_score=10, now_score=10, remain=8
+[ROUND] #167, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #168, now_player=Player5
+[TURN] Player5 PLAY ['Suits.heart_A'], gained_score=0, now_score=10, remain=10
+[ROUND] #169, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #170, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #171, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_2'], gained_score=0, now_score=10, remain=10
+[ROUND] #172, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #173, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #174, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #175, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #176, now_player=Player1
+[TURN] Player1 PASS
+[TRICK] winner=Player2, trick_score=10, total_score=20
+[ROUND] #177, now_player=Player2
+[TURN] Player2 PLAY ['Suits.spade_4'], gained_score=0, now_score=0, remain=9
+[ROUND] #178, now_player=Player3
+[TURN] Player3 PLAY ['Suits.club_5'], gained_score=5, now_score=5, remain=7
+[ROUND] #179, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_9'], gained_score=0, now_score=5, remain=5
+[ROUND] #180, now_player=Player5
+[TURN] Player5 PLAY ['Suits.diamond_B'], gained_score=10, now_score=15, remain=9
+[ROUND] #181, now_player=Player0
+[TURN] Player0 PLAY ['Suits.heart_J'], gained_score=0, now_score=15, remain=11
+[ROUND] #182, now_player=Player1
+[TURN] Player1 PLAY ['Suits.spade_Q'], gained_score=0, now_score=15, remain=7
+[ROUND] #183, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_K'], gained_score=10, now_score=25, remain=8
+[ROUND] #184, now_player=Player3
+[TURN] Player3 PLAY ['Suits.heart_A'], gained_score=0, now_score=25, remain=6
+[ROUND] #185, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #186, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #187, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #188, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #189, now_player=Player2
+[TURN] Player2 PASS
+[TRICK] winner=Player3, trick_score=25, total_score=90
+[ROUND] #190, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_3'], gained_score=0, now_score=0, remain=5
+[ROUND] #191, now_player=Player4
+[TURN] Player4 PLAY ['Suits.diamond_B'], gained_score=10, now_score=10, remain=4
+[ROUND] #192, now_player=Player5
+[TURN] Player5 PLAY ['Suits.club_K'], gained_score=10, now_score=20, remain=8
+[ROUND] #193, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #194, now_player=Player1
+[TURN] Player1 PLAY ['Suits.spade_A'], gained_score=0, now_score=20, remain=6
+[ROUND] #195, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #196, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #197, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #198, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #199, now_player=Player0
+[TURN] Player0 PASS
+[TRICK] winner=Player1, trick_score=20, total_score=65
+[ROUND] #200, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_3'], gained_score=0, now_score=0, remain=5
+[ROUND] #201, now_player=Player2
+[TURN] Player2 PLAY ['Suits.heart_4'], gained_score=0, now_score=0, remain=7
+[ROUND] #202, now_player=Player3
+[TURN] Player3 PLAY ['Suits.club_6'], gained_score=0, now_score=0, remain=4
+[ROUND] #203, now_player=Player4
+[TURN] Player4 PLAY ['Suits.club_B'], gained_score=10, now_score=10, remain=3
+[ROUND] #204, now_player=Player5
+[TURN] Player5 PLAY ['Suits.heart_K'], gained_score=10, now_score=20, remain=7
+[ROUND] #205, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #206, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_A'], gained_score=0, now_score=20, remain=4
+[ROUND] #207, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #208, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #209, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #210, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #211, now_player=Player0
+[TURN] Player0 PASS
+[TRICK] winner=Player1, trick_score=20, total_score=85
+[ROUND] #212, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_9'], gained_score=0, now_score=0, remain=3
+[ROUND] #213, now_player=Player2
+[TURN] Player2 PLAY ['Suits.spade_K'], gained_score=10, now_score=10, remain=6
+[ROUND] #214, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_A'], gained_score=0, now_score=10, remain=3
+[ROUND] #215, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #216, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #217, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #218, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #219, now_player=Player2
+[TURN] Player2 PASS
+[TRICK] winner=Player3, trick_score=10, total_score=100
+[ROUND] #220, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_7'], gained_score=0, now_score=0, remain=2
+[ROUND] #221, now_player=Player4
+[TURN] Player4 PLAY ['Suits.heart_J'], gained_score=0, now_score=0, remain=2
+[ROUND] #222, now_player=Player5
+[TURN] Player5 PLAY ['Suits.heart_A'], gained_score=0, now_score=0, remain=6
+[ROUND] #223, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #224, now_player=Player1
+[TURN] Player1 PASS
+[ROUND] #225, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #226, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #227, now_player=Player4
+[TURN] Player4 PASS
+[TRICK] winner=Player5, trick_score=0, total_score=5
+[ROUND] #228, now_player=Player5
+[TURN] Player5 PLAY ['Suits.heart_6'], gained_score=0, now_score=0, remain=5
+[ROUND] #229, now_player=Player0
+[TURN] Player0 PLAY ['Suits.heart_8'], gained_score=0, now_score=0, remain=10
+[ROUND] #230, now_player=Player1
+[TURN] Player1 PLAY ['Suits.heart_9'], gained_score=0, now_score=0, remain=2
+[ROUND] #231, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #232, now_player=Player3
+[TURN] Player3 PLAY ['Suits.spade_K'], gained_score=10, now_score=10, remain=1
+[ROUND] #233, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #234, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #235, now_player=Player0
+[TURN] Player0 PASS
+[ROUND] #236, now_player=Player1
+[TURN] Player1 PLAY ['Suits.diamond_A'], gained_score=0, now_score=10, remain=1
+[ROUND] #237, now_player=Player2
+[TURN] Player2 PASS
+[ROUND] #238, now_player=Player3
+[TURN] Player3 PASS
+[ROUND] #239, now_player=Player4
+[TURN] Player4 PASS
+[ROUND] #240, now_player=Player5
+[TURN] Player5 PASS
+[ROUND] #241, now_player=Player0
+[TURN] Player0 PASS
+[TRICK] winner=Player1, trick_score=10, total_score=95
+[ROUND] #242, now_player=Player1
+[TURN] Player1 PLAY ['Suits.club_B'], gained_score=10, now_score=10, remain=0
+[GAME] Winner is Player1
+[END]

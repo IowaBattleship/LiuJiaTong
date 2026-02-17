@@ -1,16 +1,17 @@
 import os
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from game_handler import Game_Handler
-from manager import Manager
-import logger
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _project_root)
+
+from server.game_handler import Game_Handler
+from server.manager import Manager
+import core.logger as logger
 import threading
 import argparse
-import threading
-from my_network import ReusableTCPServer
-import utils
-utils.check_packages({
+from core.network.my_network import ReusableTCPServer
+from common.console import check_packages, user_confirm, fatal, register_signal_handler
+check_packages({
     "nt": [
         ("win32api", "pypiwin32"),
         ("win32con", "pypiwin32"),
@@ -28,8 +29,8 @@ def ctrl_c_handler():
     if ctrl_c_handler_lock.locked():
         return
     with ctrl_c_handler_lock:
-        if utils.user_confirm(prompt="是否强退服务端？",default=False) is True:
-            utils.fatal("Keyboard Interrupt")
+        if user_confirm(prompt="是否强退服务端？",default=False) is True:
+            fatal("Keyboard Interrupt")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='启动六家统服务端')
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger.init_logger()
-    utils.register_signal_handler(ctrl_c_handler)
+    register_signal_handler(ctrl_c_handler)
     threading.Thread(target=manager_thread,args=(args.static,)).start()
     try:
         server = ReusableTCPServer((args.ip, args.port), Game_Handler)
@@ -47,4 +48,4 @@ if __name__ == '__main__':
         print("Listening")
         server.serve_forever()
     except Exception as e:
-        utils.fatal(f"server error: {e}")
+        fatal(f"server error: {e}")
